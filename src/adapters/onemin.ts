@@ -16,19 +16,43 @@ export async function executeOneMinAI(
   const cleanModel = modelName.replace("1min/", "");
   const isStream = request.stream ?? false;
 
-  const body = {
-    type: "CHAT",
+  const endpoint = `https://api.1min.ai/api/chat-with-ai${isStream ? "?isStreaming=true" : ""}`;
+
+  let prompt = "";
+  const images: string[] = [];
+
+  for (const m of request.messages) {
+    if (typeof m.content === "string") {
+      prompt += `${m.role}: ${m.content}\n\n`;
+    } else if (Array.isArray(m.content)) {
+      prompt += `${m.role}: `;
+      for (const part of m.content) {
+        if (part.type === "text") {
+          prompt += part.text + " ";
+        } else if (part.type === "image_url" && part.image_url?.url) {
+          images.push(part.image_url.url);
+          prompt += "[Image Attachment] ";
+        }
+      }
+      prompt += "\n\n";
+    }
+  }
+
+  prompt += "assistant:";
+
+  const body: any = {
+    type: "UNIFY_CHAT_WITH_AI",
     model: cleanModel,
-    promptObject: request.messages.map((m) => ({
-      role: m.role,
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-    })),
-    // Forward native tool fields only if present (cascade strips them for emulation)
-    ...(request.tools ? { tools: request.tools } : {}),
-    ...(request.tool_choice ? { tool_choice: request.tool_choice } : {}),
+    promptObject: {
+      prompt: prompt.trim()
+    }
   };
 
-  const response = await fetch(ONEMIN_BASE, {
+  if (images.length > 0) {
+    body.promptObject.attachments = { images };
+  }
+
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -47,10 +71,15 @@ export async function executeOneMinAI(
 
   if (!isStream) {
     const raw = await response.json() as any;
-    const content = raw?.aiRecord?.aiRecordDetail?.resultObject?.content
-      || raw?.aiRecord?.aiRecordDetail?.resultObject
-      || raw?.result || "";
-    const textContent = typeof content === "string" ? content : JSON.stringify(content);
+    let textContent = "";
+    if (raw?.aiRecord?.aiRecordDetail?.resultObject) {
+      const resObj = raw.aiRecord.aiRecordDetail.resultObject;
+      if (Array.isArray(resObj)) {
+        textContent = resObj.join("");
+      } else if (typeof resObj === "string") {
+        textContent = resObj;
+      }
+    }
 
     const completion: ChatCompletionResponse = {
       id: `chatcmpl-${crypto.randomUUID().slice(0, 10)}`,
@@ -76,59 +105,48 @@ export async function executeOneMinAI(
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
 
+  let buffer = "";
+
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const { done, value } = await reader.read();
         if (done) {
-          // Send final chunk and DONE
-          const finalChunk: ChatCompletionChunk = {
-            id: `chatcmpl-${crypto.randomUUID().slice(0, 10)}`,
-            object: "chat.completion.chunk",
-            created: Math.floor(Date.now() / 1000),
-            model: cleanModel,
-            choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-          };
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalChunk)}\n\ndata: [DONE]\n\n`));
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
           return;
         }
 
-        const text = decoder.decode(value, { stream: true });
-        // 1min may return plain text or SSE lines
-        const lines = text.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
 
-          let content = trimmed;
-          if (trimmed.startsWith("data: ")) {
-            const data = trimmed.slice(6);
-            if (data === "[DONE]") {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              continue;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              // If already OpenAI-format, pass through
-              if (parsed.choices) {
-                controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                continue;
-              }
-              content = parsed.content || parsed.text || data;
-            } catch {
-              content = data;
+        for (const part of parts) {
+          let eventType = "message";
+          let data = "";
+          for (const line of part.split("\n")) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ")) {
+              data = line.slice(6).trim();
             }
           }
 
-          const chunk: ChatCompletionChunk = {
-            id: `chatcmpl-${crypto.randomUUID().slice(0, 10)}`,
-            object: "chat.completion.chunk",
-            created: Math.floor(Date.now() / 1000),
-            model: cleanModel,
-            choices: [{ index: 0, delta: { content }, finish_reason: null }],
-          };
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          if (eventType === "content" && data) {
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                const chunk: ChatCompletionChunk = {
+                  id: `chatcmpl-${crypto.randomUUID().slice(0, 10)}`,
+                  object: "chat.completion.chunk",
+                  created: Math.floor(Date.now() / 1000),
+                  model: cleanModel,
+                  choices: [{ index: 0, delta: { content: parsed.content }, finish_reason: null }],
+                };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+              }
+            } catch (e) {}
+          }
         }
       } catch (err) {
         controller.error(err);

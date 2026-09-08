@@ -273,6 +273,8 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         } else {
           url = ""; // sem chave gemini, cai no catálogo
         }
+      } else if (id === "1min") {
+        url = ""; // 1min.ai nao possui endpoint padrao /models documentado
       } else if (id === "openrouter" || id === "openrouter-free") {
         url = "https://openrouter.ai/api/v1/models";
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
@@ -321,6 +323,12 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
   // Fallbacks específicos para garantir catálogo funcional se upstream estiver sem chave
   const providerFallbacks: Record<string, string[]> = {
     gemini: ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-pro-exp-02-05"],
+    "1min": [
+      "gpt-4o", "gpt-4o-mini", "o3-mini", "claude-sonnet-4-6", "claude-sonnet-5", "claude-opus-5", 
+      "deepseek-reasoner", "deepseek-chat", "deepseek-v4-pro", "deepseek-v4-flash",
+      "gemini-3.8-flash", "gemini-3.7-flash", "gemini-2.5-pro", "gemini-2.5-flash",
+      "qwen3.7-plus", "qwen3.7-max", "qwen-max", "mistral-large-latest", "sonar-reasoning-pro", "grok-4.6"
+    ],
     groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-coder-32b", "gemma2-9b-it", "mixtral-8x7b-32768", "deepseek-r1-distill-llama-70b"],
     cerebras: ["llama3.3-70b", "llama3.1-8b", "llama3.1-70b"],
     sambanova: ["Meta-Llama-3.3-70B-Instruct", "Qwen2.5-72B-Instruct", "Qwen2.5-Coder-32B-Instruct", "Llama-3.2-11B-Vision-Instruct", "DeepSeek-R1-Distill-Llama-70B"],
