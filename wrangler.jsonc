@@ -15,16 +15,16 @@
   // Run: wrangler kv:namespace create OMNI_CACHE
   //      wrangler kv:namespace create OMNI_KEYS
   // Then paste the returned IDs below.
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "OMNI_CACHE",
-  //     "id": "<YOUR_OMNI_CACHE_KV_ID>"
-  //   },
-  //   {
-  //     "binding": "OMNI_KEYS",
-  //     "id": "<YOUR_OMNI_KEYS_KV_ID>"
-  //   }
-  // ],
+  "kv_namespaces": [
+    {
+      "binding": "OMNI_CACHE",
+      "id": "<YOUR_OMNI_CACHE_KV_ID>"
+    },
+    {
+      "binding": "OMNI_KEYS",
+      "id": "<YOUR_OMNI_KEYS_KV_ID>"
+    }
+  ],
 
   // Non-secret runtime defaults. AUTH_TOKEN is the only first-run secret; provider credentials are added through Administration.
   "vars": {
