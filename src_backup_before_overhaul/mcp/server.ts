@@ -1,6 +1,6 @@
 import { dispatchSearch } from "@/search/dispatcher";
 import { fetchWithJinaReader } from "@/search/jina";
-import { getAdminConfig } from "@/admin/store";
+import { PROVIDER_REGISTRY } from "@/config/providers";
 import type { EnvBindings } from "@/types/provider";
 
 /**
@@ -77,12 +77,11 @@ export async function executeMcpTool(
     }
 
     case "list_providers": {
-      const adminCfg = await getAdminConfig(env);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(adminCfg.providers, null, 2),
+            text: JSON.stringify(PROVIDER_REGISTRY, null, 2),
           },
         ],
       };

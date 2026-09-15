@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { DEFAULT_MODELS_CATALOG } from "./config/constants";
 import { formatAnthropicToOpenAI, createOpenAIToAnthropicTransformStream } from "./adapters/anthropic";
 import { applyContextCompression } from "./compression/pipeline";
 import { applyModalityBridge } from "./modality/bridge";
@@ -162,7 +163,7 @@ app.get("/health", (c) =>
 // ---------------------------------------------------------------------------
 app.get("/v1/models", async (c) => {
   const adminCfg = await getAdminConfig(c.env);
-  const comboModels = Object.values(adminCfg.combos || {})
+  const comboModels = Object.values(adminCfg.combos)
     .filter((cb) => cb.enabled)
     .map((cb) => ({
       id: cb.id,
@@ -172,35 +173,19 @@ app.get("/v1/models", async (c) => {
       description: cb.description,
     }));
 
-  const providerModels: any[] = [];
-  if (adminCfg.providers) {
-    for (const p of Object.values(adminCfg.providers)) {
-      if (!p.enabled) continue;
-      for (const m of p.models) {
-        if (!m.enabled) continue;
-        providerModels.push({
-          id: m.id || m,
-          object: "model",
-          created: 1710000000,
-          owned_by: p.id,
-          permission: [],
-          root: m.id || m,
-          parent: null,
-          pricing: { input_per_million: p.costPerMillionInput, output_per_million: p.costPerMillionOutput },
-        });
-      }
-    }
-  }
+  const catalogModels = DEFAULT_MODELS_CATALOG.map((m) => ({
+    id: m.id,
+    object: "model",
+    created: 1710000000,
+    owned_by: m.owned_by,
+    permission: [],
+    root: m.id,
+    parent: null,
+    pricing: m.pricing,
+    context_length: m.context_length,
+  }));
 
-  // Deduplicate models
-  const uniqueModelsMap = new Map();
-  for (const m of providerModels) {
-    if (!uniqueModelsMap.has(m.id)) {
-      uniqueModelsMap.set(m.id, m);
-    }
-  }
-
-  return c.json({ object: "list", data: [...comboModels, ...Array.from(uniqueModelsMap.values())] });
+  return c.json({ object: "list", data: [...comboModels, ...catalogModels] });
 });
 
 // ---------------------------------------------------------------------------

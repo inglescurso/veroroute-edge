@@ -37,13 +37,12 @@ function getCurrentPeriods(): { day: string; month: string } {
 /**
  * Estimate cost based on provider pricing and token counts.
  */
-export async function estimateCost(
-  env: EnvBindings,
+export function estimateCost(
   providerId: string,
   promptTokens: number,
   completionTokens: number,
-): Promise<number> {
-  const cfg = await getProviderConfig(env, providerId);
+): number {
+  const cfg = getProviderConfig(providerId);
   if (!cfg) return 0;
   const inputCost = (promptTokens / 1_000_000) * cfg.costPerMillionInput;
   const outputCost = (completionTokens / 1_000_000) * cfg.costPerMillionOutput;
@@ -64,7 +63,7 @@ export async function recordUsage(
   const kv = env.OMNI_CACHE;
   if (!kv) return;
 
-  const cost = await estimateCost(env, providerId, promptTokens, completionTokens);
+  const cost = estimateCost(providerId, promptTokens, completionTokens);
   const periods = getCurrentPeriods();
   const scope = principal.kind === "virtual" ? principal.id : "master";
 

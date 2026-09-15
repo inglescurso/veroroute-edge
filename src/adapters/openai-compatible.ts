@@ -1,4 +1,3 @@
-import { getProviderConfig, PROVIDER_REGISTRY } from "@/config/providers";
 import { formatGeminiSSEChunkToOpenAI, formatGeminiToOpenAI, formatOpenAIToGemini } from "./gemini";
 import type { ChatCompletionRequest } from "@/types/openai";
 
@@ -7,23 +6,18 @@ import type { ChatCompletionRequest } from "@/types/openai";
  */
 export async function executeOpenAICompatible(
   request: ChatCompletionRequest,
-  providerId: string,
-  apiKey: string,
-  modelName: string
+  config: { baseUrl: string; apiKey: string; protocol: string }
 ): Promise<Response> {
-  const provider = getProviderConfig(providerId);
-  if (!provider) {
-    throw new Error(`Provedor desconhecido: ${providerId}`);
-  }
+  const { baseUrl, apiKey, protocol } = config;
+  const modelName = request.model;
 
   // --- Caso Especial: Google Gemini REST API ---
-  if (providerId === "gemini") {
+  if (protocol === "gemini") {
     const isStream = request.stream ?? false;
     const cleanModel = modelName.replace("gemini/", "");
-    // FIX 1: non-streaming usa ?key=...; streaming usa ?alt=sse&key=...
     const url = isStream
-      ? `${provider.baseUrl}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
-      : `${provider.baseUrl}/models/${cleanModel}:generateContent?key=${apiKey}`;
+      ? `${baseUrl}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
+      : `${baseUrl}/models/${cleanModel}:generateContent?key=${apiKey}`;
 
     const geminiBody = formatOpenAIToGemini(request);
 
@@ -38,139 +32,76 @@ export async function executeOpenAICompatible(
       return new Response(
         JSON.stringify({
           error: {
-            message: `Erro Gemini (${res.status}): ${errText}`,
-            status: res.status,
+            message: `Upstream Gemini API error: ${res.statusText}`,
+            type: "upstream_error",
+            details: errText,
           },
         }),
         { status: res.status, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    if (!isStream) {
-      const geminiJson = await res.json();
-      const openAiJson = formatGeminiToOpenAI(geminiJson, modelName);
-      return new Response(JSON.stringify(openAiJson), {
-        headers: { "Content-Type": "application/json" },
+    if (isStream) {
+      const { readable, writable } = new TransformStream();
+      res.body?.pipeTo(writable);
+
+      return new Response(readable.pipeThrough(new TransformStream({
+        transform(chunk, controller) {
+          const text = new TextDecoder().decode(chunk);
+          const lines = text.split("\n").filter(l => l.trim().startsWith("data: "));
+          for (const line of lines) {
+            const dataStr = line.replace(/^data: /, "").trim();
+            if (dataStr === "[DONE]") {
+              controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+              continue;
+            }
+            try {
+              const geminiChunk = JSON.parse(dataStr);
+              const openaiChunk = formatGeminiSSEChunkToOpenAI(geminiChunk, cleanModel);
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+            } catch (e) {
+              console.error("Erro no parse do chunk Gemini", e);
+            }
+          }
+        }
+      })), {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
       });
     }
 
-    // Stream SSE Transform
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    const reader = res.body?.getReader();
-    if (!reader) return new Response("Sem corpo de resposta", { status: 500 });
-
-    (async () => {
-      let buffer = "";
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.replace(/^data:\s*/, "");
-
-            if (dataStr === "[DONE]") {
-              await writer.write(encoder.encode("data: [DONE]\n\n"));
-              continue;
-            }
-
-            try {
-              const chunkJson = JSON.parse(dataStr);
-              const openAiSSE = formatGeminiSSEChunkToOpenAI(chunkJson, modelName);
-              if (openAiSSE) {
-                await writer.write(encoder.encode(openAiSSE));
-              }
-            } catch {}
-          }
-        }
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
-        await writer.close();
-      } catch (err) {
-        console.error("Erro streaming Gemini:", err);
-        try {
-          await writer.abort(err);
-        } catch {}
-      }
-    })();
-
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const geminiRes: any = await res.json();
+    const openaiRes = formatGeminiToOpenAI(geminiRes, cleanModel);
+    return new Response(JSON.stringify(openaiRes), {
+      headers: { "Content-Type": "application/json" },
     });
   }
 
-  // --- Provedores Padrão OpenAI (Groq, Cerebras, OpenRouter, SambaNova, Mistral, DeepSeek, Pollinations) ---
+  // --- OpenAI / Anthropic-like via fetch ---
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-
+  
   if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    if (protocol === "anthropic") headers["x-api-key"] = apiKey;
+    else headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
-  if (providerId === "openrouter") {
-    headers["HTTP-Referer"] = "https://omniroute.inglescurso.com.br";
-    headers["X-Title"] = "OmniRoute Serverless";
-  }
-
-  // Ajusta o nome do modelo se houver prefixo de provedor
-  let targetModel = modelName;
-  if (targetModel.includes("/")) {
-    if (providerId !== "openrouter") {
-      targetModel = targetModel.split("/").pop() || targetModel;
-    }
-  }
-
-  const endpoint = `${provider.baseUrl}/chat/completions`;
-  const bodyPayload = {
-    ...request,
-    model: targetModel,
-    // Remove parâmetros customizados do OmniRoute antes de enviar ao upstream
-    routing_strategy: undefined,
-    output_style: undefined,
-    enable_search: undefined,
-    search_provider: undefined,
-    fallbacks: undefined,
-    compression: undefined,
-  };
-
-  const upstreamResponse = await fetch(endpoint, {
+  const endpoint = baseUrl.replace(/\/+$/, "") + "/chat/completions";
+  const res = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify(bodyPayload),
+    body: JSON.stringify(request),
   });
 
-  // Em caso de streaming SSE pass-through direto
-  if (request.stream && upstreamResponse.ok) {
-    return new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-  }
-
-  // Resposta síncrona JSON ou erro
-  const respBody = await upstreamResponse.text();
-  return new Response(respBody, {
-    status: upstreamResponse.status,
+  return new Response(res.body, {
+    status: res.status,
     headers: {
-      "Content-Type": upstreamResponse.headers.get("Content-Type") || "application/json",
+      "Content-Type": res.headers.get("Content-Type") || "application/json",
     },
   });
 }

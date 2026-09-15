@@ -1,12 +1,11 @@
-import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
 import { executeAntigravityRequest } from "@/adapters/antigravity";
 import { executeCloudflareAI } from "@/adapters/cloudflare-ai";
 import { executeOneMinAI } from "@/adapters/onemin";
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
 import { getValidAntigravityAccessToken } from "@/oauth/antigravity";
-import { markKeyRateLimited, selectActiveCredential } from "./keyPool";
+import { markKeyRateLimited, selectActiveKey as selectActiveCredential } from "./keyPool";
 import { getAdminConfig } from "@/admin/store";
-import { getProviderConfig, registerCustomProvider } from "@/config/providers";
+import { getProviderConfig } from "@/config/providers";
 import { applyRoutingStrategy, recordCandidateSuccess, type TargetCandidate } from "./strategies";
 import { injectToolCallingPrompt, postProcessEmulatedResponse, completionToSSE } from "@/adapters/toolEmulation";
 import { withDeadline, UpstreamTimeout, boundedInt } from "./resilience";
@@ -28,51 +27,50 @@ export function resolveCandidates(
 ): { candidates: TargetCandidate[]; comboStrategy?: string } {
   const model = request.model;
 
-  if (adminCfg?.combos?.[model]?.enabled) {
+  if (adminCfg?.combos?.[model]) {
     const combo = adminCfg.combos[model];
     return {
-      candidates: combo.targets.map((t) => ({
+      candidates: combo.providers.map((t) => ({
         provider: t.provider,
         model: t.model,
-        weight: t.weight,
-        priority: t.priority,
+        weight: t.weight || 1,
+        priority: 1,
         cost: 0,
       })),
       comboStrategy: combo.strategy,
     };
   }
 
-  for (const prefix of ["antigravity", "1min", "cloudflare-ai", "cerebras", "groq", "gemini", "azure", "bedrock"]) {
-    if (model.startsWith(prefix + "/") || (prefix === "cloudflare-ai" && model.startsWith("@cf/"))) {
+  // Support explicit provider/model routing
+  if (model.includes("/")) {
+    const [providerId, ...modelParts] = model.split("/");
+    const targetModel = modelParts.join("/");
+    if (adminCfg?.providers?.[providerId]) {
       return {
-        candidates: [{ provider: prefix, model, weight: 1, priority: 1, cost: 0 }],
+        candidates: [{ provider: providerId, model: targetModel, weight: 1, priority: 1, cost: 0 }]
       };
     }
   }
 
-  const entry = DEFAULT_MODELS_CATALOG.find((m) => m.id === model);
-  if (entry) {
-    return {
-      candidates: [{
-        provider: entry.provider,
-        model: entry.id,
-        weight: 1,
-        priority: 1,
-        cost: entry.pricing?.input_per_million ?? 0,
-      }],
-    };
+  // Scan all enabled providers to find which ones offer this model
+  const candidates: TargetCandidate[] = [];
+  if (adminCfg?.providers) {
+    for (const [providerId, providerCfg] of Object.entries(adminCfg.providers)) {
+      if (!providerCfg.enabled) continue;
+      const m = providerCfg.models.find(m => m.id === model && m.enabled);
+      if (m) {
+        candidates.push({
+          provider: providerId,
+          model: model,
+          weight: 1,
+          priority: 1,
+          cost: providerCfg.costPerMillionInput || 0,
+        });
+      }
+    }
   }
 
-  const fallback = DEFAULT_MODELS_CATALOG[0];
-  return {
-    candidates: fallback ? [{
-      provider: fallback.provider,
-      model: fallback.id,
-      weight: 1,
-      priority: 1,
-      cost: fallback.pricing?.input_per_million ?? 0,
-    }] : [],
-  };
+  return { candidates };
 }
 
 // ---------------------------------------------------------------------------
@@ -108,11 +106,7 @@ export async function dispatchWithCascade(
 ): Promise<Response> {
   const adminCfg = await getAdminConfig(env);
 
-  if (adminCfg.customProviders) {
-    for (const cp of Object.values(adminCfg.customProviders)) {
-      registerCustomProvider(cp.id, cp as any);
-    }
-  }
+
 
   // C1: Rate limit enforcement (per-key RPM + global quota)
   if (principal) {
@@ -154,8 +148,9 @@ export async function dispatchWithCascade(
       continue;
     }
 
-    const provCfg = getProviderConfig(candidate.provider);
-    const needsToolEmulation = hasTools && provCfg?.supportsTools === false;
+    const provCfg = await getProviderConfig(env, candidate.provider);
+    const protocol = provCfg?.protocol || "openai";
+    const needsToolEmulation = hasTools && (protocol === "cloudflare-ai" || protocol === "1min");
 
     let outbound = request;
     if (needsToolEmulation) {
@@ -164,24 +159,27 @@ export async function dispatchWithCascade(
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const credential = await selectActiveCredential(env, candidate.provider);
-        const apiKey = credential.apiKey;
+        const apiKey = await selectActiveCredential(env, candidate.provider);
 
         let response: Response;
         try {
           response = await withDeadline(async (signal) => {
-            if (candidate.provider === "cloudflare-ai") {
+            if (protocol === "cloudflare-ai") {
               return executeCloudflareAI(outbound, env.AI, candidate.model);
             }
-            if (candidate.provider === "antigravity") {
+            if (protocol === "antigravity") {
               const antigravResult = await getValidAntigravityAccessToken(env);
               if (!antigravResult?.accessToken) throw new Error("Antigravity: no valid access token");
               return executeAntigravityRequest(outbound, antigravResult.accessToken, antigravResult.projectId || "", candidate.model);
             }
-            if (candidate.provider === "1min") {
+            if (protocol === "1min") {
               return executeOneMinAI(outbound, apiKey, candidate.model);
             }
-            return executeOpenAICompatible(outbound, candidate.provider, apiKey, candidate.model);
+            return executeOpenAICompatible(outbound, {
+              baseUrl: provCfg!.baseUrl,
+              apiKey,
+              protocol
+            });
           }, candidateTimeout);
         } catch (err) {
           if (err instanceof UpstreamTimeout) {
