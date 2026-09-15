@@ -82,7 +82,7 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Update wrangler.jsonc with your KV namespace IDs
+# 4. Update wrangler.toml with your KV namespace IDs
 
 # 5. Set mandatory master AUTH_TOKEN secret
 npx wrangler secret put AUTH_TOKEN
@@ -210,7 +210,7 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Atualizar o arquivo wrangler.jsonc com os IDs gerados do KV
+# 4. Atualizar o arquivo wrangler.toml com os IDs gerados do KV
 
 # 5. Definir a chave mestre AUTH_TOKEN
 npx wrangler secret put AUTH_TOKEN

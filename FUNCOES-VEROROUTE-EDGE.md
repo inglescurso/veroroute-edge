@@ -198,7 +198,7 @@ O gateway possui uma interface visual integrada acessível diretamente no navega
 
 ## 13. Guia de Variáveis de Ambiente & Bindings
 
-### Cloudflare Bindings (wrangler.jsonc):
+### Cloudflare Bindings (wrangler.toml):
 - `AI`: Binding do Cloudflare Workers AI.
 - `OMNI_CACHE`: KV Namespace para cache de respostas e cooldowns de chaves.
 - `OMNI_KEYS`: KV Namespace para chaves virtuais, tokens OAuth e orçamentos.
