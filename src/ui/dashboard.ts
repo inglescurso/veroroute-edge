@@ -2527,7 +2527,7 @@ npx wrangler deploy
       const authBtn = document.getElementById('agy-auth-btn');
       
       if (authBtn) {
-        authBtn.href = '/api/oauth/antigravity/authorize?token=' + encodeURIComponent(getStoredToken());
+        authBtn.href = '/api/oauth/antigravity/authorize?token=' + encodeURIComponent(getAdminToken());
       }
 
       if (!badge) return;
