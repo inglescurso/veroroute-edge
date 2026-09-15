@@ -613,18 +613,131 @@ export function renderDashboardHtml(): string {
     <!-- TAB 2: PROVEDORES -->
     <div id="tab-providers" class="tab-pane">
       <div class="card">
-        <div class="card-title" style="justify-content: space-between; display: flex;">
-          <span>🌐 Provedores de IA</span>
-          <button class="btn" onclick="openNewProviderModal()">+ Novo Provedor</button>
-        </div>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-          Gerencie seus provedores de IA. Utilize os templates para configurar rapidamente provedores conhecidos (OpenAI, Anthropic, Gemini, Groq) ou configure provedores customizados.
-        </p>
-        <div id="providers-list" class="provider-grid">
-          <!-- Injected via JS -->
+        <div class="card-title">🌐 Provedores Corporativos & Gratuitos Configurados</div>
+        <div class="provider-grid">
+          <!-- 1min.ai -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">1min.ai (com Tool Calling)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">ReAct Emulation · GPT-4o, Claude 3.5</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: 1min/gpt-4o, 1min/claude-3-5-sonnet</span>
+          </div>
+
+          <!-- Alibaba DashScope -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Alibaba Cloud (DashScope / Qwen)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Free-tier generoso · Qwen 2.5 Coder</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: qwen-max, qwen-plus, qwen2.5-coder</span>
+          </div>
+
+          <!-- OpenAI Oficial -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">OpenAI Oficial</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Modelos Flagship de Referência</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gpt-4o, gpt-4o-mini, o3-mini</span>
+          </div>
+
+          <!-- Google Gemini -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Google Gemini (AI Studio)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">60M tokens/mês grátis · 15 RPM</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gemini-2.5-flash, 2.0-flash, 2.5-pro</span>
+          </div>
+
+          <!-- Antigravity CLI -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Antigravity CLI (Code Assist)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">OAuth Google · Gemini 2.5 Pro & Claude 3.7</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: antigravity/gemini-2.5-pro</span>
+          </div>
+
+          <!-- Groq -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Groq Cloud</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">14.4k req/dia · 500+ tokens/seg</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: llama-3.3-70b-versatile, mixtral</span>
+          </div>
+
+          <!-- Cerebras -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Cerebras Inference</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">1M tokens/dia · 2.000 tokens/seg</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: cerebras/llama3.3-70b</span>
+          </div>
+
+          <!-- Cloudflare AI -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Cloudflare Workers AI (Nativo)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">10k neurônios/dia · Zero credencial</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: Llama 3.3 70B FP8, DeepSeek R1</span>
+          </div>
+
+          <!-- Pollinations -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Pollinations.ai (Keyless)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Fallback ilimitado e sem chave</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: openai, mistral, claude</span>
+          </div>
+
+          <!-- FreeAPIKey -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">FreeAPIKey (Agregador)</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Rotas gratuitas multi-provedor</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gpt-4o-mini, claude-3-haiku</span>
+          </div>
+
+          <!-- Azure OpenAI -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Azure OpenAI</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Deployments corporativos dedicados</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: azure/gpt-4o</span>
+          </div>
+
+          <!-- Amazon Bedrock -->
+          <div class="provider-box">
+            <div class="provider-header">
+              <span class="provider-name">Amazon Bedrock</span>
+              <span class="status-dot"></span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">AWS Bedrock Claude & Llama</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: bedrock/claude-3-5-sonnet</span>
+          </div>
         </div>
       </div>
     </div>
+
     <!-- TAB 3: BUSCA WEB & RAG -->
     <div id="tab-search" class="tab-pane">
       <div class="card">
@@ -963,6 +1076,12 @@ dsh --model combo-super-payload
               <option value="serper">Google Serper (2.500 buscas grátis)</option>
               <option value="brave">Brave Search API (2.000 buscas/mês grátis)</option>
               <option value="tavily">Tavily AI Search (1.000 buscas/mês grátis)</option>
+              <option value="firecrawl">Firecrawl (Search API)</option>
+              <option value="exa">Exa AI Search</option>
+              <option value="context7">Context7 API</option>
+              <option value="linkup">Linkup Search</option>
+              <option value="searchapi">SearchAPI</option>
+              <option value="ydc">YDC Index</option>
             </select>
           </div>
           <div>
@@ -980,6 +1099,30 @@ dsh --model combo-super-payload
           <div>
             <label style="font-size:0.85rem; color: var(--text-muted);">Tavily API Key:</label>
             <input type="password" id="adm-search-tavily" placeholder="tvly-...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">Firecrawl API Key:</label>
+            <input type="password" id="adm-search-firecrawl" placeholder="fc-...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">Exa API Key:</label>
+            <input type="password" id="adm-search-exa" placeholder="exa_...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">Context7 API Key:</label>
+            <input type="password" id="adm-search-context7" placeholder="c7-...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">Linkup API Key:</label>
+            <input type="password" id="adm-search-linkup" placeholder="lk-...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">SearchAPI API Key:</label>
+            <input type="password" id="adm-search-searchapi" placeholder="sapi-...">
+          </div>
+          <div>
+            <label style="font-size:0.85rem; color: var(--text-muted);">YDC Index API Key:</label>
+            <input type="password" id="adm-search-ydc" placeholder="ydc-...">
           </div>
         </div>
         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -1060,10 +1203,21 @@ dsh --model combo-super-payload
         </div>
 
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <select id="modal-add-provider" onchange="updateComboModelDropdown()" style="font-size: 0.8rem; width: 140px;">
+          <select id="modal-add-provider" style="font-size: 0.8rem; width: 140px;">
+            <option value="gemini">gemini</option>
+            <option value="groq">groq</option>
+            <option value="cerebras">cerebras</option>
+            <option value="alibaba">alibaba</option>
+            <option value="antigravity">antigravity</option>
+            <option value="1min">1min</option>
+            <option value="cloudflare-ai">cloudflare-ai</option>
+            <option value="openrouter">openrouter</option>
+            <option value="pollinations">pollinations</option>
+            <option value="openai">openai</option>
+            <option value="azure">azure</option>
+            <option value="bedrock">bedrock</option>
           </select>
-          <select id="modal-add-model" style="flex: 1; min-width: 180px; font-size: 0.8rem;">
-          </select>
+          <input type="text" id="modal-add-model" placeholder="Nome do modelo (ex: gemini-2.5-flash)" style="flex: 1; min-width: 180px; font-size: 0.8rem;" />
           <button type="button" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="addModalTarget()">+ Adicionar Alvo</button>
         </div>
       </div>
@@ -1250,63 +1404,6 @@ dsh --model combo-super-payload
     </div>
   </div>
 
-  <!-- MODAL: EDITOR DE PROVEDOR -->
-  <div id="modal-provider-editor" class="modal-overlay">
-    <div class="modal-card" style="max-width: 650px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-        <h3 id="pe-title" style="margin: 0; font-size: 1.15rem; color: #fff;">Novo Provedor</h3>
-        <button type="button" class="btn btn-secondary" onclick="closeProviderEditor()" style="padding: 0.3rem 0.6rem;">✕</button>
-      </div>
-
-      <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Template:</label>
-        <select id="pe-template" onchange="applyProviderTemplate()">
-          <option value="custom">Customizado</option>
-          <!-- Injected via JS -->
-        </select>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-        <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">ID / Nome:</label>
-          <input type="text" id="pe-id" placeholder="ex: openai, groq">
-        </div>
-        <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Protocolo:</label>
-          <select id="pe-protocol">
-            <option value="openai">OpenAI (Padrão)</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="gemini">Gemini</option>
-          </select>
-        </div>
-      </div>
-
-      <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Base URL:</label>
-        <input type="text" id="pe-baseurl" placeholder="https://api.openai.com/v1">
-      </div>
-      
-      <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Chaves de API (uma por linha ou separadas por vírgula):</label>
-        <textarea id="pe-keys" rows="3" placeholder="sk-..."></textarea>
-      </div>
-
-      <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center;">
-        <button class="btn btn-secondary" id="pe-sync-btn" onclick="syncProviderModels()">🔄 Sincronizar Modelos</button>
-        <span id="pe-sync-status" style="font-size: 0.85rem; color: var(--text-muted);"></span>
-      </div>
-
-      <div id="pe-models-container" style="display: none; margin-bottom: 1.5rem; max-height: 220px; overflow-y: auto; background: rgba(0,0,0,0.25); border: 1px solid var(--card-border); padding: 1rem; border-radius: 8px;">
-        <!-- Checkboxes de modelos sincronizados -->
-      </div>
-
-      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--card-border); padding-top: 1.25rem;">
-        <button class="btn btn-secondary" onclick="closeProviderEditor()">Cancelar</button>
-        <button class="btn" onclick="saveProviderEditor()">Salvar Provedor</button>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL: SOBRE, UPSTREAM & GUIA DE ATUALIZAÇÃO -->
   <div id="modal-about" class="modal-overlay">
     <div class="modal-card" style="max-width: 680px;">
@@ -1446,7 +1543,7 @@ npx wrangler deploy
         }
       }
     }
-        function showTab(tabId) {
+    function showTab(tabId) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       const pane = document.getElementById('tab-' + tabId);
@@ -1457,7 +1554,6 @@ npx wrangler deploy
       if (tabId === 'combos') loadCombos();
       else if (tabId === 'antigravity') loadAntigravityStatus();
       else if (tabId === 'admin') loadAdmin();
-      else if (tabId === 'providers') loadProvidersTab();
     }
 
     function showToast(msg, type) {
@@ -2326,6 +2422,12 @@ npx wrangler deploy
           if (cfg.serperApiKey) document.getElementById('adm-search-serper').value = cfg.serperApiKey;
           if (cfg.braveApiKey) document.getElementById('adm-search-brave').value = cfg.braveApiKey;
           if (cfg.tavilyApiKey) document.getElementById('adm-search-tavily').value = cfg.tavilyApiKey;
+          if (cfg.firecrawlApiKey) document.getElementById('adm-search-firecrawl').value = cfg.firecrawlApiKey;
+          if (cfg.exaApiKey) document.getElementById('adm-search-exa').value = cfg.exaApiKey;
+          if (cfg.context7ApiKey) document.getElementById('adm-search-context7').value = cfg.context7ApiKey;
+          if (cfg.linkupApiKey) document.getElementById('adm-search-linkup').value = cfg.linkupApiKey;
+          if (cfg.searchapiApiKey) document.getElementById('adm-search-searchapi').value = cfg.searchapiApiKey;
+          if (cfg.ydcApiKey) document.getElementById('adm-search-ydc').value = cfg.ydcApiKey;
         }
       } catch (e) {
         console.error('Erro ao carregar config de busca', e);
@@ -2338,12 +2440,18 @@ npx wrangler deploy
       const serperApiKey = document.getElementById('adm-search-serper').value.trim();
       const braveApiKey = document.getElementById('adm-search-brave').value.trim();
       const tavilyApiKey = document.getElementById('adm-search-tavily').value.trim();
+      const firecrawlApiKey = document.getElementById('adm-search-firecrawl').value.trim();
+      const exaApiKey = document.getElementById('adm-search-exa').value.trim();
+      const context7ApiKey = document.getElementById('adm-search-context7').value.trim();
+      const linkupApiKey = document.getElementById('adm-search-linkup').value.trim();
+      const searchapiApiKey = document.getElementById('adm-search-searchapi').value.trim();
+      const ydcApiKey = document.getElementById('adm-search-ydc').value.trim();
 
       try {
         const res = await adminFetch('/api/admin/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ engine, searxngUrl, serperApiKey, braveApiKey, tavilyApiKey })
+          body: JSON.stringify({ engine, searxngUrl, serperApiKey, braveApiKey, tavilyApiKey, firecrawlApiKey, exaApiKey, context7ApiKey, linkupApiKey, searchapiApiKey, ydcApiKey })
         });
         const data = await res.json();
         if (data.ok) {
@@ -2540,6 +2648,7 @@ npx wrangler deploy
             '</div>' +
             '<div style="display:flex; gap:0.4rem; flex-wrap:wrap;">' +
               '<button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" data-combo-id="' + escapeHtml(c.id) + '" onclick="testCombo(this.dataset.comboId)">▶️ Testar Modelos</button>' +
+              '<button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" data-combo-id="' + escapeHtml(c.id) + '" onclick="testComboCascade(this.dataset.comboId)">🌊 Testar Cascata</button>' +
               '<button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" data-combo-id="' + escapeHtml(c.id) + '" onclick="openQuickAddModelModal(this.dataset.comboId)">+ Modelo</button>' +
               '<button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.78rem;" data-combo-id="' + escapeHtml(c.id) + '" onclick="openEditComboModal(this.dataset.comboId)">✏️ Editar</button>' +
               '<button class="btn btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.78rem; background:rgba(244,63,94,0.15); color:var(--rose);" data-combo-id="' + escapeHtml(c.id) + '" onclick="deleteCombo(this.dataset.comboId)">🗑️</button>' +
@@ -2579,7 +2688,6 @@ npx wrangler deploy
       document.getElementById('combo-form-strategy').value = 'priority';
       modalTargets = [];
       renderModalTargets();
-      populateComboProviders();
       document.getElementById('modal-combo').classList.add('active');
     }
 
@@ -2592,9 +2700,8 @@ npx wrangler deploy
       document.getElementById('combo-form-name').value = c.name || c.id;
       document.getElementById('combo-form-desc').value = c.description || '';
       document.getElementById('combo-form-strategy').value = c.strategy || 'priority';
-      modalTargets = (c.providers || c.targets || []).map(function(t) { return { provider: t.provider, model: t.model }; });
+      modalTargets = (c.targets || []).map(function(t) { return { provider: t.provider, model: t.model }; });
       renderModalTargets();
-      populateComboProviders();
       document.getElementById('modal-combo').classList.add('active');
     }
 
@@ -2617,42 +2724,6 @@ npx wrangler deploy
         '</div>';
       });
       container.innerHTML = html;
-    }
-
-    function populateComboProviders() {
-      const selProv = document.getElementById('modal-add-provider');
-      if (!selProv) return;
-      selProv.innerHTML = '';
-      const providers = currentConfig?.providers || {};
-      for (const p of Object.values(providers)) {
-        if (p.enabled !== false) {
-          const opt = document.createElement('option');
-          opt.value = p.id;
-          opt.innerText = p.id;
-          selProv.appendChild(opt);
-        }
-      }
-      updateComboModelDropdown();
-    }
-    
-    function updateComboModelDropdown() {
-      const selProv = document.getElementById('modal-add-provider').value;
-      const selMod = document.getElementById('modal-add-model');
-      if (!selMod) return;
-      selMod.innerHTML = '';
-      const providers = currentConfig?.providers || {};
-      const p = providers[selProv];
-      if (p && p.models) {
-        for (const m of p.models) {
-          if (m.enabled !== false || typeof m === 'string') {
-            const opt = document.createElement('option');
-            const mid = m.id || m;
-            opt.value = mid;
-            opt.innerText = mid;
-            selMod.appendChild(opt);
-          }
-        }
-      }
     }
 
     function addModalTarget() {
@@ -2808,10 +2879,9 @@ npx wrangler deploy
 
     async function testCombo(comboId) {
       const c = currentCombos[comboId];
-      const targets = c?.providers || c?.targets || [];
-      if (targets.length === 0) return showToast('Este combo não possui modelos para testar.', 'info');
+      if (!c || !c.targets || c.targets.length === 0) return showToast('Este combo não possui modelos para testar.', 'info');
 
-      targets.forEach(function(_, idx) {
+      c.targets.forEach(function(_, idx) {
         const badge = document.getElementById('test-badge-' + comboId + '-' + idx);
         if (badge) {
           badge.className = 'badge-latency';
@@ -2837,7 +2907,8 @@ npx wrangler deploy
                 badge.innerText = '⚡ ' + r.latency_ms + 'ms · OK';
               } else {
                 badge.className = 'badge-latency err';
-                badge.innerText = '❌ ' + (r.status || 'Erro') + (r.latency_ms ? ' (' + r.latency_ms + 'ms)' : '');
+                let errMsg = r.status === 401 ? 'Falta Chave/Inválida' : (r.status || 'Erro');
+                badge.innerText = '❌ ' + errMsg + (r.latency_ms ? ' (' + r.latency_ms + 'ms)' : '');
                 badge.title = r.error || 'Falha no teste';
               }
             }
@@ -2845,6 +2916,32 @@ npx wrangler deploy
         }
       } catch (e) {
         showToast('Erro ao executar testes: ' + e.message, 'error');
+      }
+    }
+
+    async function testComboCascade(comboId) {
+      showToast('Testando roteamento da cascata ' + comboId + '...', 'info');
+      try {
+        const start = Date.now();
+        const res = await adminFetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: comboId,
+            messages: [{ role: 'user', content: 'Respond exactly with the word OK and nothing else.' }],
+            max_tokens: 5
+          })
+        });
+        const latency = Date.now() - start;
+        if (res.ok) {
+          const data = await res.json();
+          showToast('✅ Cascata OK (' + latency + 'ms). Resposta: ' + (data.choices?.[0]?.message?.content || ''), 'success');
+        } else {
+          const err = await res.text();
+          showToast('❌ Cascata falhou (' + res.status + ') - Nenhuma chave de API configurada funcionou.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de rede: ' + e.message, 'error');
       }
     }
 
@@ -2868,220 +2965,6 @@ npx wrangler deploy
         loadAdmin();
       }
     }
-
-    // ============ GERENCIAMENTO DE PROVEDORES (NOVO) ============
-    let currentConfig = { providers: {}, templates: {} };
-
-    async function loadProvidersTab() {
-      try {
-        const res = await adminFetch('/api/admin/config');
-        if (!res.ok) throw new Error('Falha ao buscar config');
-        currentConfig = await res.json();
-        renderProvidersList();
-        renderTemplatesDropdown();
-      } catch (err) {
-        showToast('Erro ao carregar configurações: ' + err.message, 'error');
-      }
-    }
-
-    function renderProvidersList() {
-      const grid = document.getElementById('providers-list');
-      if (!grid) return;
-      grid.innerHTML = '';
-      const providers = Object.values(currentConfig.providers || {});
-      
-      if (providers.length === 0) {
-        grid.innerHTML = '<div style="color:var(--text-muted); padding: 1rem;">Nenhum provedor configurado. Clique em "+ Novo Provedor".</div>';
-        return;
-      }
-
-      providers.forEach(p => {
-        const box = document.createElement('div');
-        box.className = 'provider-box';
-        box.innerHTML =
-          '  <div class="provider-header">' +
-          '    <span class="provider-name" style="font-size: 1.05rem;">' + escapeHtml(p.id) + '</span>' +
-          '    <span class="status-dot" style="background: var(--emerald); box-shadow: 0 0 8px var(--emerald);"></span>' +
-          '  </div>' +
-          '  <span style="font-size: 0.8rem; color: var(--text-muted); word-break: break-all;">' + escapeHtml(p.baseUrl) + '</span>' +
-          '  <span style="font-size: 0.75rem; color: var(--text-muted);">Protocolo: <strong style="color: #fff;">' + (p.protocol || 'openai') + '</strong></span>' +
-          '  <span style="font-size: 0.75rem; color: var(--primary);">Modelos: ' + (p.models ? p.models.length : 0) + ' ativos</span>' +
-          '  <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">' +
-          '    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" onclick="editProvider(&apos;' + escapeHtml(p.id) + '&apos;)">✏️ Editar</button>' +
-          '    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; color: var(--rose);" onclick="deleteProvider(&apos;' + escapeHtml(p.id) + '&apos;)">🗑️ Excluir</button>' +
-          '  </div>';
-        grid.appendChild(box);
-      });
-    }
-
-    function renderTemplatesDropdown() {
-      const select = document.getElementById('pe-template');
-      if (!select) return;
-      select.innerHTML = '<option value="custom">Customizado</option>';
-      const templates = currentConfig.templates || {};
-      for (const tpl of Object.values(templates)) {
-        select.innerHTML += '<option value="' + tpl.id + '">' + (tpl.name || tpl.id) + '</option>';
-      }
-    }
-
-    function applyProviderTemplate() {
-      const key = document.getElementById('pe-template').value;
-      if (key === 'custom') return;
-      const tpl = currentConfig.templates.find(t => t.id === key);
-      if (!tpl) return;
-      document.getElementById('pe-id').value = key;
-      document.getElementById('pe-baseurl').value = tpl.baseUrl || '';
-      document.getElementById('pe-protocol').value = tpl.protocol || 'openai';
-    }
-
-    function openNewProviderModal() {
-      document.getElementById('pe-title').innerText = 'Novo Provedor';
-      document.getElementById('pe-id').value = '';
-      document.getElementById('pe-id').disabled = false;
-      document.getElementById('pe-baseurl').value = '';
-      document.getElementById('pe-keys').value = '';
-      document.getElementById('pe-template').value = 'custom';
-      document.getElementById('pe-protocol').value = 'openai';
-      document.getElementById('pe-models-container').style.display = 'none';
-      document.getElementById('pe-models-container').innerHTML = '';
-      document.getElementById('pe-sync-status').innerText = '';
-      document.getElementById('modal-provider-editor').classList.add('active');
-    }
-
-    function editProvider(id) {
-      const p = currentConfig.providers[id];
-      if (!p) return;
-      document.getElementById('pe-title').innerText = 'Editar Provedor: ' + p.id;
-      document.getElementById('pe-id').value = p.id;
-      document.getElementById('pe-id').disabled = true;
-      document.getElementById('pe-baseurl').value = p.baseUrl || '';
-      document.getElementById('pe-keys').value = (p.keys || []).join('\\n');
-      document.getElementById('pe-protocol').value = p.protocol || 'openai';
-      document.getElementById('pe-template').value = 'custom';
-      
-      const container = document.getElementById('pe-models-container');
-      container.innerHTML = '<div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 0.5rem; color: #fff;">Modelos Ativos:</div>';
-      (p.models || []).forEach(m => {
-        const mid = m.id || m;
-        container.innerHTML +=
-          '  <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">' +
-          '    <input type="checkbox" value="' + escapeHtml(mid) + '" checked class="pe-model-cb" style="width: 16px; height: 16px;">' +
-          '    <span style="font-family:monospace; font-size: 0.85rem;">' + escapeHtml(mid) + '</span>' +
-          '  </label>';
-      });
-      container.style.display = 'block';
-      document.getElementById('pe-sync-status').innerText = '';
-      document.getElementById('modal-provider-editor').classList.add('active');
-    }
-
-    function closeProviderEditor() {
-      document.getElementById('modal-provider-editor').classList.remove('active');
-    }
-
-    async function syncProviderModels() {
-      const baseUrl = document.getElementById('pe-baseurl').value.trim();
-      const keysStr = document.getElementById('pe-keys').value.trim();
-      const apiKey = keysStr.split(/[,\\n]+/)[0]?.trim() || '';
-      const protocol = document.getElementById('pe-protocol').value;
-      const status = document.getElementById('pe-sync-status');
-      
-      if (!baseUrl) {
-        showToast('Preencha a Base URL antes de sincronizar.', 'info');
-        return;
-      }
-      
-      status.innerHTML = '⏳ Buscando modelos...';
-      
-      try {
-        const res = await adminFetch('/api/admin/providers/sync', {
-          method: 'POST',
-          body: JSON.stringify({ baseUrl, apiKey, protocol })
-        });
-        const data = await res.json();
-        
-        if (!data.success) {
-          status.innerHTML = '<span style="color: var(--rose);">❌ Erro: ' + escapeHtml(data.error || 'Falha ao buscar') + '</span>';
-          return;
-        }
-        
-        status.innerHTML = '<span style="color: var(--emerald);">✅ Encontrados ' + data.models.length + ' modelos!</span>';
-        const container = document.getElementById('pe-models-container');
-        container.innerHTML = '<div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 0.5rem; color: #fff;">Modelos Sincronizados (Selecione os que deseja habilitar):</div>';
-        
-        data.models.forEach(m => {
-          container.innerHTML +=
-            '  <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">' +
-            '    <input type="checkbox" value="' + escapeHtml(m) + '" checked class="pe-model-cb" style="width: 16px; height: 16px;">' +
-            '    <span style="font-family:monospace; font-size: 0.85rem;">' + escapeHtml(m) + '</span>' +
-            '  </label>';
-        });
-        container.style.display = 'block';
-        
-      } catch (err) {
-        status.innerHTML = '<span style="color: var(--rose);">❌ Falha de rede.</span>';
-      }
-    }
-
-    async function saveProviderEditor() {
-      const id = document.getElementById('pe-id').value.trim();
-      const baseUrl = document.getElementById('pe-baseurl').value.trim();
-      const keysStr = document.getElementById('pe-keys').value.trim();
-      const keys = keysStr.split(/[,\\n]+/).map(s => s.trim()).filter(Boolean);
-      const protocol = document.getElementById('pe-protocol').value;
-      
-      const modelCbs = document.querySelectorAll('.pe-model-cb:checked');
-      const models = Array.from(modelCbs).map(cb => ({ id: cb.value, enabled: true }));
-
-      if (!id || !baseUrl) {
-        showToast('Os campos ID e Base URL são obrigatórios.', 'error');
-        return;
-      }
-
-      const payload = {
-        name: id,
-        baseUrl,
-        keys,
-        protocol,
-        models,
-        enabled: true
-      };
-
-      try {
-        const res = await adminFetch('/api/admin/providers/' + encodeURIComponent(id), {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        
-        if (res.ok) {
-          showToast('Provedor salvo com sucesso!', 'success');
-          closeProviderEditor();
-          await loadProvidersTab();
-        } else {
-          const err = await res.json();
-          showToast('Erro ao salvar: ' + (err.error || 'Erro desconhecido'), 'error');
-        }
-      } catch (err) {
-        showToast('Erro: ' + err.message, 'error');
-      }
-    }
-
-    async function deleteProvider(id) {
-      if (!confirm('ATENÇÃO: Deseja realmente remover o provedor "' + id + '"?')) return;
-      try {
-        const res = await adminFetch('/api/admin/providers/' + encodeURIComponent(id), {
-          method: 'DELETE'
-        });
-        if (res.ok) {
-          showToast('Provedor excluído com sucesso!', 'info');
-          await loadProvidersTab();
-        } else {
-          showToast('Erro ao excluir o provedor.', 'error');
-        }
-      } catch (err) {
-        showToast('Erro: ' + err.message, 'error');
-      }
-    }
-
   </script>
 </body>
 </html>`;

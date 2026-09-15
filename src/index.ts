@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { DEFAULT_MODELS_CATALOG } from "./config/constants";
 import { formatAnthropicToOpenAI, createOpenAIToAnthropicTransformStream } from "./adapters/anthropic";
 import { applyContextCompression } from "./compression/pipeline";
 import { applyModalityBridge } from "./modality/bridge";
@@ -22,7 +23,7 @@ import {
   isModelAllowed,
   recordVirtualKeyUse,
 } from "./admin/auth";
-import { getAdminConfig, getAntigravityOAuthCredentials } from "./admin/store";
+import { getAdminConfig, getAntigravityOAuthCredentials, appendProviderCredentials } from "./admin/store";
 import type { AnthropicMessagesRequest } from "./types/anthropic";
 import type { ChatCompletionRequest } from "./types/openai";
 import type { EnvBindings } from "./types/provider";
@@ -162,7 +163,7 @@ app.get("/health", (c) =>
 // ---------------------------------------------------------------------------
 app.get("/v1/models", async (c) => {
   const adminCfg = await getAdminConfig(c.env);
-  const comboModels = Object.values(adminCfg.combos || {})
+  const comboModels = Object.values(adminCfg.combos)
     .filter((cb) => cb.enabled)
     .map((cb) => ({
       id: cb.id,
@@ -172,35 +173,19 @@ app.get("/v1/models", async (c) => {
       description: cb.description,
     }));
 
-  const providerModels: any[] = [];
-  if (adminCfg.providers) {
-    for (const p of Object.values(adminCfg.providers)) {
-      if (!p.enabled) continue;
-      for (const m of p.models) {
-        if (!m.enabled) continue;
-        providerModels.push({
-          id: m.id || m,
-          object: "model",
-          created: 1710000000,
-          owned_by: p.id,
-          permission: [],
-          root: m.id || m,
-          parent: null,
-          pricing: { input_per_million: p.costPerMillionInput, output_per_million: p.costPerMillionOutput },
-        });
-      }
-    }
-  }
+  const catalogModels = DEFAULT_MODELS_CATALOG.map((m) => ({
+    id: m.id,
+    object: "model",
+    created: 1710000000,
+    owned_by: m.owned_by,
+    permission: [],
+    root: m.id,
+    parent: null,
+    pricing: m.pricing,
+    context_length: m.context_length,
+  }));
 
-  // Deduplicate models
-  const uniqueModelsMap = new Map();
-  for (const m of providerModels) {
-    if (!uniqueModelsMap.has(m.id)) {
-      uniqueModelsMap.set(m.id, m);
-    }
-  }
-
-  return c.json({ object: "list", data: [...comboModels, ...Array.from(uniqueModelsMap.values())] });
+  return c.json({ object: "list", data: [...comboModels, ...catalogModels] });
 });
 
 // ---------------------------------------------------------------------------
@@ -355,10 +340,17 @@ app.get("/api/oauth/antigravity/callback", async (c) => {
   try {
     const { clientId, clientSecret } = await getAntigravityOAuthCredentials(c.env);
     const tokens = await exchangeAntigravityCode(code, redirectUri, clientId, clientSecret);
-    await c.env.OMNI_KEYS.put("antigravity_tokens", JSON.stringify(tokens));
+    
+    // Suporte a Multi-Contas: Salvamos o refresh_token no pool padrão
+    const keyData = JSON.stringify({
+      refresh_token: tokens.refresh_token,
+      project_id: tokens.project_id || "",
+    });
+    await appendProviderCredentials(c.env, "antigravity", [{ apiKey: keyData }]);
+
     return c.html(`<html><body style="font-family:sans-serif;background:#0b0f19;color:#fff;padding:2rem;text-align:center">
-      <h2 style="color:#10b981">✅ Antigravity Conectado com Sucesso!</h2>
-      <p style="color:#94a3b8;margin:1rem 0">Projeto: <code>${tokens.project_id ?? "auto"}</code></p>
+      <h2 style="color:#10b981">✅ Conta Google Conectada com Sucesso!</h2>
+      <p style="color:#94a3b8;margin:1rem 0">Você pode adicionar múltiplas contas. Projeto GCP: <code>${tokens.project_id ?? "auto"}</code></p>
       <a href="/" style="color:#38bdf8">⬅ Voltar ao Dashboard</a>
     </body></html>`);
   } catch (err: unknown) {
@@ -384,7 +376,10 @@ app.post("/api/oauth/antigravity/import", async (c) => {
       const redirectUri = "http://127.0.0.1:443/callback";
       const { clientId, clientSecret } = await getAntigravityOAuthCredentials(c.env);
       const tokens = await exchangeAntigravityCode(code, redirectUri, clientId, clientSecret);
-      await c.env.OMNI_KEYS.put("antigravity_tokens", JSON.stringify(tokens));
+      
+      const keyData = JSON.stringify({ refresh_token: tokens.refresh_token, project_id: tokens.project_id || "" });
+      await appendProviderCredentials(c.env, "antigravity", [{ apiKey: keyData }]);
+
       return c.json({ ok: true, message: `Autenticado com sucesso! Projeto: ${tokens.project_id || "auto"}` });
     } catch (err: unknown) {
       return c.json({ ok: false, error: `Falha na troca de código: ${err instanceof Error ? err.message : String(err)}` }, 400);
@@ -402,11 +397,10 @@ app.post("/api/oauth/antigravity/import", async (c) => {
     } catch { /* not JSON — use as-is */ }
   }
 
-  await c.env.OMNI_KEYS.put(
-    "antigravity_tokens",
-    JSON.stringify({ refresh_token: refreshToken, project_id: projectId, expires_at: 0 })
-  );
-  return c.json({ ok: true, message: "Credenciais do Antigravity salvas no KV" });
+  const keyData = JSON.stringify({ refresh_token: refreshToken, project_id: projectId });
+  await appendProviderCredentials(c.env, "antigravity", [{ apiKey: keyData }]);
+  
+  return c.json({ ok: true, message: "Credenciais do Antigravity salvas no pool." });
 });
 
 // ---------------------------------------------------------------------------

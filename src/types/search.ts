@@ -4,7 +4,7 @@
 
 export interface SearchRequest {
   query: string;
-  provider?: "searxng" | "duckduckgo" | "tavily" | "serper" | "auto";
+  provider?: "searxng" | "duckduckgo" | "tavily" | "serper" | "auto" | "brave" | "firecrawl" | "exa" | "context7" | "linkup" | "searchapi" | "ydc";
   limit?: number;
   search_type?: "web" | "news";
   country?: string;

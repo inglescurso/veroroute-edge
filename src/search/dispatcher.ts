@@ -76,6 +76,73 @@ export async function dispatchSearch(
     }
   }
 
+  // Novos Provedores:
+  const firecrawlKey = env.FIRECRAWL_API_KEY?.trim();
+  if (results.length === 0 && firecrawlKey && (requestedProvider === "auto" || requestedProvider === "firecrawl")) {
+    try {
+      const { searchWithFirecrawl } = await import("./extras");
+      results = await searchWithFirecrawl(req, firecrawlKey);
+      usedProvider = "firecrawl";
+    } catch (err) {
+      console.warn("Firecrawl falhou:", err);
+    }
+  }
+
+  const exaKey = env.EXA_API_KEY?.trim();
+  if (results.length === 0 && exaKey && (requestedProvider === "auto" || requestedProvider === "exa")) {
+    try {
+      const { searchWithExa } = await import("./extras");
+      results = await searchWithExa(req, exaKey);
+      usedProvider = "exa";
+    } catch (err) {
+      console.warn("Exa falhou:", err);
+    }
+  }
+
+  const context7Key = env.CONTEXT7_API_KEY?.trim();
+  if (results.length === 0 && context7Key && (requestedProvider === "auto" || requestedProvider === "context7")) {
+    try {
+      const { searchWithContext7 } = await import("./extras");
+      results = await searchWithContext7(req, context7Key);
+      usedProvider = "context7";
+    } catch (err) {
+      console.warn("Context7 falhou:", err);
+    }
+  }
+
+  const linkupKey = env.LINKUP_API_KEY?.trim();
+  if (results.length === 0 && linkupKey && (requestedProvider === "auto" || requestedProvider === "linkup")) {
+    try {
+      const { searchWithLinkup } = await import("./extras");
+      results = await searchWithLinkup(req, linkupKey);
+      usedProvider = "linkup";
+    } catch (err) {
+      console.warn("Linkup falhou:", err);
+    }
+  }
+
+  const searchapiKey = env.SEARCHAPI_API_KEY?.trim();
+  if (results.length === 0 && searchapiKey && (requestedProvider === "auto" || requestedProvider === "searchapi")) {
+    try {
+      const { searchWithSearchAPI } = await import("./extras");
+      results = await searchWithSearchAPI(req, searchapiKey);
+      usedProvider = "searchapi";
+    } catch (err) {
+      console.warn("SearchAPI falhou:", err);
+    }
+  }
+
+  const ydcKey = env.YDC_API_KEY?.trim();
+  if (results.length === 0 && ydcKey && (requestedProvider === "auto" || requestedProvider === "ydc")) {
+    try {
+      const { searchWithYDC } = await import("./extras");
+      results = await searchWithYDC(req, ydcKey);
+      usedProvider = "ydc";
+    } catch (err) {
+      console.warn("YDC falhou:", err);
+    }
+  }
+
   // 5. DuckDuckGo: fallback realmente universal, inclusive quando um motor
   // escolhido não possui URL/chave ou falha. Nenhuma URL de busca é obrigatória.
   if (results.length === 0) {

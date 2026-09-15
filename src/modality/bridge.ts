@@ -1,6 +1,6 @@
-import { getAdminConfig } from "@/admin/store";
+import { PROVIDER_REGISTRY } from "@/config/providers";
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
-import { selectActiveKey } from "@/routing/keyPool";
+import { selectActiveCredential } from "@/routing/keyPool";
 import type { ChatCompletionRequest, ChatMessage, ChatMessageContentPart } from "@/types/openai";
 import type { EnvBindings } from "@/types/provider";
 
@@ -14,18 +14,11 @@ export async function applyModalityBridge(
 ): Promise<ChatCompletionRequest> {
   const model = request.model;
   // Se o modelo já for multimodal nativo, dispensa a ponte
-  const adminCfg = await getAdminConfig(env);
-  let isVisionCapable = model.includes("gemini") || model.includes("claude") || model.includes("gpt-4o") || model.includes("antigravity");
-  
-  if (adminCfg.providers) {
-    for (const p of Object.values(adminCfg.providers)) {
-      const m = p.models.find(mod => mod.id === model);
-      if (m && m.capabilities?.vision) {
-        isVisionCapable = true;
-        break;
-      }
-    }
-  }
+  const isVisionCapable =
+    model.includes("gemini") ||
+    model.includes("claude") ||
+    model.includes("gpt-4o") ||
+    model.includes("antigravity");
 
   if (isVisionCapable) return request;
 
@@ -84,7 +77,8 @@ export async function applyModalityBridge(
 }
 
 async function describeImageWithVision(imageUrl: string, env: EnvBindings): Promise<string> {
-  const geminiKey = await selectActiveKey(env, "gemini");
+  const credential = await selectActiveCredential(env, "gemini");
+  const geminiKey = credential.apiKey;
   if (!geminiKey) return "Imagem presente (chave Gemini não disponível para descrição).";
 
   const visionReq: ChatCompletionRequest = {
@@ -108,7 +102,7 @@ async function describeImageWithVision(imageUrl: string, env: EnvBindings): Prom
     stream: false,
   };
 
-  const res = await executeOpenAICompatible(visionReq, { baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: geminiKey, protocol: "gemini" });
+  const res = await executeOpenAICompatible(visionReq, "gemini", geminiKey, "gemini-2.5-flash");
   if (!res.ok) return "Não foi possível transcrever a imagem.";
 
   const data = (await res.json()) as any;

@@ -2,6 +2,30 @@
  * Definições e interfaces de Provedores e Ambiente Cloudflare Workers
  */
 
+export type ProviderId =
+  | "openai"
+  | "azure"
+  | "bedrock"
+  | "alibaba"
+  | "gemini"
+  | "groq"
+  | "cerebras"
+  | "cloudflare-ai"
+  | "antigravity"
+  | "1min"
+  | "freeapikey"
+  | "openrouter"
+  | "sambanova"
+  | "mistral"
+  | "deepseek"
+  | "pollinations"
+  | "cheaperinference"
+  | "agentrouter"
+  | "bazaarlink"
+  | "huggingface"
+  | "nvidia"
+  | "custom";
+
 export type RoutingStrategy =
   | "priority"
   | "weighted"
@@ -36,34 +60,31 @@ export interface ProviderHealthState {
   avgLatencyMs: number;
 }
 
-export interface DynamicModel {
-  id: string;
-  enabled: boolean;
-  capabilities?: { vision?: boolean; tools?: boolean };
-}
-
-export interface DynamicProvider {
-  id: string;
+export interface ProviderConfig {
+  id: ProviderId;
   name: string;
-  protocol: "openai" | "anthropic" | "gemini" | "antigravity" | "cloudflare-ai" | "1min" | "azure";
-  baseUrl: string;
-  keys: string[]; // pool de chaves
-  enabled: boolean;
-  models: DynamicModel[];
+  baseUrl?: string;
+  authType: "bearer" | "apikey-header" | "query" | "oauth" | "native-binding";
+  headerName?: string;
+  models: string[];
   freeTier: boolean;
   costPerMillionInput: number;
   costPerMillionOutput: number;
+  supportsStreaming: boolean;
+  supportsTools: boolean;
+  supportsVision: boolean;
+  rpmLimit?: number;
+  /** Environment variable name that holds the API keys list for this provider */
+  envKey?: string;
 }
 
 export interface ComboRule {
   id: string;
   name: string;
   alias: string;
-  enabled: boolean;
-  description?: string;
   strategy: RoutingStrategy;
   providers: Array<{
-    provider: string; // DynamicProvider id
+    provider: ProviderId;
     model: string;
     weight?: number;
   }>;
@@ -91,6 +112,34 @@ export interface EnvBindings {
   MAX_RETRIES?: string;
   RETRY_DELAY_MS?: string;
 
+  // Chaves de Provedores Corporativos & Populares
+  OPENAI_API_KEYS?: string;
+  AZURE_OPENAI_API_KEYS?: string;
+  AZURE_OPENAI_ENDPOINT?: string;
+  BEDROCK_API_KEYS?: string;
+  ALIBABA_API_KEYS?: string;
+  ONE_MIN_API_KEYS?: string;
+  FREEAPIKEY_KEYS?: string;
+
+  // Chaves de Provedores Gratuitos de Alta Capacidade
+  GEMINI_API_KEYS?: string;
+  GROQ_API_KEYS?: string;
+  CEREBRAS_API_KEYS?: string;
+  SAMBANOVA_API_KEYS?: string;
+  MISTRAL_API_KEYS?: string;
+  OPENROUTER_API_KEYS?: string;
+  DEEPSEEK_API_KEYS?: string;
+  POLLINATIONS_API_KEYS?: string;
+  TAVILY_API_KEYS?: string;
+  FIRECRAWL_API_KEY?: string;
+  EXA_API_KEY?: string;
+  CONTEXT7_API_KEY?: string;
+  LINKUP_API_KEY?: string;
+  SEARCHAPI_API_KEY?: string;
+  YDC_API_KEY?: string;
+  SERPER_API_KEYS?: string;
+  FIRECRAWL_API_KEYS?: string;
+
   // Credenciais Antigravity / Google Cloud Code Assist
   ANTIGRAVITY_CLIENT_ID?: string;
   ANTIGRAVITY_CLIENT_SECRET?: string;
@@ -102,10 +151,4 @@ export interface EnvBindings {
   QUOTA_MAX_REQUESTS?: string;
   QUOTA_WINDOW_SECONDS?: string;
   QUOTA_POLICY?: string;
-
-  // Legacy keys to keep typescript happy in unmigrated adapters
-  OPENAI_API_KEYS?: string;
-  TAVILY_API_KEYS?: string;
-  SERPER_API_KEY?: string;
-  BRAVE_SEARCH_API_KEY?: string;
 }

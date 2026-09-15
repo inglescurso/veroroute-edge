@@ -180,86 +180,69 @@ function extractProjectId(data: any): string {
 }
 
 /**
- * Obtém ou atualiza o Access Token válido do Antigravity armazenado no KV ou Variáveis
+ * Obtém ou atualiza o Access Token válido do Antigravity fazendo rodízio pelas contas (Multi-Account)
  */
 export async function getValidAntigravityAccessToken(
   env: EnvBindings
 ): Promise<{ accessToken: string; projectId: string }> {
   const { clientId, clientSecret } = await getAntigravityOAuthCredentials(env);
+  
+  // A-11: Usamos o pool padrão de chaves para pegar o refresh token. Isso permite N contas.
+  const { selectActiveCredential } = await import("@/routing/keyPool");
+  const credential = await selectActiveCredential(env, "antigravity");
+  
+  if (!credential.apiKey && !env.ANTIGRAVITY_REFRESH_TOKEN && !env.ANTIGRAVITY_ACCESS_TOKEN) {
+    throw new Error("Antigravity não configurado. Realize o login OAuth ou configure chaves.");
+  }
 
-  // 1. Verifica no KV se existe token salvo
-  if (env.OMNI_KEYS) {
-    const rawSaved = await env.OMNI_KEYS.get("antigravity_tokens");
-    if (rawSaved) {
-      try {
-        const tokens = JSON.parse(rawSaved) as AntigravityTokens;
-        // Se ainda for válido, retorna
-        if (tokens.access_token && tokens.expires_at > Date.now()) {
-          return {
-            accessToken: tokens.access_token,
-            projectId: tokens.project_id || env.ANTIGRAVITY_PROJECT_ID || "",
-          };
-        }
+  // Fallback para as variáveis de ambiente clássicas
+  if (!credential.apiKey && env.ANTIGRAVITY_ACCESS_TOKEN) {
+    return { accessToken: env.ANTIGRAVITY_ACCESS_TOKEN, projectId: env.ANTIGRAVITY_PROJECT_ID || "" };
+  }
 
-        // Se expirou e temos refresh_token, renova
-        if (tokens.refresh_token) {
-          const renewed = await refreshAntigravityToken(
-            tokens.refresh_token,
-            clientId,
-            clientSecret || env.ANTIGRAVITY_CLIENT_SECRET
-          );
-          tokens.access_token = renewed.access_token;
-          tokens.expires_at = renewed.expires_at;
-          if (!tokens.project_id) {
-            tokens.project_id = await discoverCompanionProject(renewed.access_token).catch(() => "");
-          }
-          await env.OMNI_KEYS.put("antigravity_tokens", JSON.stringify(tokens));
-          return {
-            accessToken: tokens.access_token,
-            projectId: tokens.project_id || env.ANTIGRAVITY_PROJECT_ID || "",
-          };
-        }
-      } catch (e) {
-        console.error("Erro ao ler tokens do KV Antigravity:", e);
-      }
+  let refreshToken = env.ANTIGRAVITY_REFRESH_TOKEN || "";
+  let projectId = env.ANTIGRAVITY_PROJECT_ID || "";
+
+  if (credential.apiKey) {
+    try {
+      const parsed = JSON.parse(credential.apiKey);
+      refreshToken = parsed.refresh_token || parsed.token || "";
+      projectId = parsed.project_id || "";
+    } catch {
+      refreshToken = credential.apiKey;
     }
   }
 
-  // 2. Verifica se foi passado via variáveis de ambiente
-  if (env.ANTIGRAVITY_REFRESH_TOKEN) {
-    const renewed = await refreshAntigravityToken(
-      env.ANTIGRAVITY_REFRESH_TOKEN,
-      clientId,
-      clientSecret || env.ANTIGRAVITY_CLIENT_SECRET
-    );
-    const projectId =
-      env.ANTIGRAVITY_PROJECT_ID ||
-      (await discoverCompanionProject(renewed.access_token).catch(() => ""));
+  // Tenta recuperar o Access Token renovado no cache para este Refresh Token (evitar throttling do Google)
+  if (env.OMNI_CACHE && refreshToken) {
+    // Hasheia o refresh token para a chave do cache
+    const encoder = new TextEncoder();
+    const data = encoder.encode(refreshToken);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    const cacheKey = `agy_access_${hashHex.substring(0, 16)}`;
 
-    // Salva no KV para reuso se disponível
-    if (env.OMNI_KEYS) {
-      await env.OMNI_KEYS.put(
-        "antigravity_tokens",
-        JSON.stringify({
-          access_token: renewed.access_token,
-          refresh_token: env.ANTIGRAVITY_REFRESH_TOKEN,
-          expires_at: renewed.expires_at,
-          project_id: projectId,
-        })
-      );
+    const cached = await env.OMNI_CACHE.get(cacheKey);
+    if (cached) {
+      return { accessToken: cached, projectId };
     }
 
+    // Se não está no cache, renova
+    const renewed = await refreshAntigravityToken(refreshToken, clientId, clientSecret || env.ANTIGRAVITY_CLIENT_SECRET);
+    if (!projectId) {
+      projectId = await discoverCompanionProject(renewed.access_token).catch(() => "");
+    }
+
+    // Salva no cache com TTL de 3000 segundos (50 min, antes dos 60 min de expiração do Google)
+    await env.OMNI_CACHE.put(cacheKey, renewed.access_token, { expirationTtl: 3000 });
     return { accessToken: renewed.access_token, projectId };
   }
 
-  if (env.ANTIGRAVITY_ACCESS_TOKEN) {
-    return {
-      accessToken: env.ANTIGRAVITY_ACCESS_TOKEN,
-      projectId: env.ANTIGRAVITY_PROJECT_ID || "",
-    };
+  // Caminho sem cache (não recomendado, mas funcional)
+  const renewed = await refreshAntigravityToken(refreshToken, clientId, clientSecret || env.ANTIGRAVITY_CLIENT_SECRET);
+  if (!projectId) {
+    projectId = await discoverCompanionProject(renewed.access_token).catch(() => "");
   }
-
-  throw new Error(
-    "Antigravity não configurado. Realize o login OAuth ou configure ANTIGRAVITY_REFRESH_TOKEN."
-  );
+  return { accessToken: renewed.access_token, projectId };
 }
