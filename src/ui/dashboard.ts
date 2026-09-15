@@ -1801,7 +1801,7 @@ npx wrangler deploy
 
     async function saveAgyToken() {
       const val = document.getElementById('agy-token-input').value.trim();
-      if (!val) return alert('Por favor, insira o token ou JSON');
+      if (!val) return showToast('Por favor, insira o token ou JSON', 'error');
       try {
         const res = await adminFetch('/api/oauth/antigravity/import', {
           method: 'POST',
@@ -1810,12 +1810,14 @@ npx wrangler deploy
         });
         const data = await res.json();
         if (data.ok) {
-          alert('Credenciais salvas com sucesso!');
+          showToast('Credenciais salvas com sucesso!', 'success');
+          document.getElementById('agy-token-input').value = '';
+          loadAntigravityStatus();
         } else {
-          alert('Erro ao salvar: ' + (data.error || 'Desconhecido'));
+          showToast('Erro ao salvar: ' + (data.error || 'Desconhecido'), 'error');
         }
       } catch (e) {
-        alert('Erro: ' + e.message);
+        showToast('Erro: ' + e.message, 'error');
       }
     }
 
