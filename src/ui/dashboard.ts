@@ -1275,10 +1275,6 @@ dsh --model combo-super-payload
       <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.8rem;">
         Insira a chave secreta <code>AUTH_TOKEN</code> configurada no seu Cloudflare Worker para acessar e gerenciar provedores, modelos, chaves e combos.
       </p>
-      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.6rem; border-radius: 6px; margin-bottom: 1.2rem;">
-        <span style="color: var(--amber); font-size: 0.75rem;"><strong>Dica:</strong> Se você não configurou o Secret na Cloudflare, a senha padrão é <code>admin</code>.</span>
-      </div>
-
       <div style="margin-bottom: 1rem;">
         <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.4rem;">
           AUTH_TOKEN do VeroRoute Edge:
