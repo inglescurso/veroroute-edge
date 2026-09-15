@@ -25,3 +25,5 @@ QUOTA_WINDOW_SECONDS = "60"
 
 [observability]
 enabled = true
+
+# Corrigido: Removido caracteres invalidos e forçado conflito para limpeza
