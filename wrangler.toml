@@ -27,3 +27,7 @@ QUOTA_WINDOW_SECONDS = "60"
 enabled = true
 
 # Corrigido: Removido caracteres invalidos e forçado conflito para limpeza
+
+[[kv_namespaces]]
+binding = "OMNI_KEYS"
+id = "baa93433d3cb4380a7c6f9f3204b7f9f"
