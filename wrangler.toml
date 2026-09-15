@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "AI"
 
 [vars]
+AUTH_TOKEN = "MudeEstaSenha123"
 SEARXNG_URL = "opcional"
 DEFAULT_ROUTING_STRATEGY = "priority"
 DEFAULT_OUTPUT_STYLE = "none"
