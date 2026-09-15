@@ -18,10 +18,8 @@ export function getAntigravityAuthUrl(
   state = "agy_auth",
   clientId = ANTIGRAVITY_PUBLIC_CONFIG.clientId
 ): string {
-  if (!clientId || clientId === "YOUR_GOOGLE_CLIENT_ID_HERE") {
-    throw new Error(
-      "ANTIGRAVITY_CREDENTIALS_REQUIRED: O Client ID do Google OAuth não foi configurado. Configure no Painel de Administração (aba Antigravity OAuth) ou via variável ANTIGRAVITY_CLIENT_ID."
-    );
+  if (!clientId) {
+    throw new Error("O Client ID do Google OAuth não foi configurado.");
   }
 
   const params = new URLSearchParams({
@@ -45,10 +43,8 @@ export async function exchangeAntigravityCode(
   clientId = ANTIGRAVITY_PUBLIC_CONFIG.clientId,
   clientSecret = ANTIGRAVITY_PUBLIC_CONFIG.clientSecret
 ): Promise<AntigravityTokens> {
-  if (!clientId || clientId === "YOUR_GOOGLE_CLIENT_ID_HERE" || !clientSecret || clientSecret === "YOUR_GOOGLE_CLIENT_SECRET_HERE") {
-    throw new Error(
-      "ANTIGRAVITY_CREDENTIALS_REQUIRED: Credenciais de OAuth do Google não configuradas. Configure o Client ID e Client Secret no Painel de Administração."
-    );
+  if (!clientId || !clientSecret) {
+    throw new Error("Credenciais de OAuth do Google não configuradas.");
   }
 
   const bodyParams: Record<string, string> = {

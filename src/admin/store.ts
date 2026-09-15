@@ -1,4 +1,5 @@
 import type { EnvBindings } from "@/types/provider";
+import { ANTIGRAVITY_PUBLIC_CONFIG } from "@/config/constants";
 export interface ProviderCredential {
   apiKey: string;
 }
@@ -282,17 +283,21 @@ export async function getAntigravityOAuthCredentials(
 ): Promise<{ clientId: string; clientSecret: string; isConfigured: boolean }> {
   const cfg = await getAdminConfig(env);
   const fromKv = cfg.antigravityConfig;
+  
+  // 1. Try KV
+  // 2. Try Env vars
+  // 3. Fallback to embedded credentials
   const clientId =
     fromKv?.clientId?.trim() ||
-    (typeof env.ANTIGRAVITY_CLIENT_ID === "string" ? env.ANTIGRAVITY_CLIENT_ID.trim() : "");
+    (typeof env.ANTIGRAVITY_CLIENT_ID === "string" ? env.ANTIGRAVITY_CLIENT_ID.trim() : "") ||
+    ANTIGRAVITY_PUBLIC_CONFIG.clientId;
+    
   const clientSecret =
     fromKv?.clientSecret?.trim() ||
-    (typeof env.ANTIGRAVITY_CLIENT_SECRET === "string" ? env.ANTIGRAVITY_CLIENT_SECRET.trim() : "");
-  const isConfigured = Boolean(
-    clientId && clientSecret &&
-    clientId !== "YOUR_GOOGLE_CLIENT_ID_HERE" &&
-    clientSecret !== "YOUR_GOOGLE_CLIENT_SECRET_HERE"
-  );
+    (typeof env.ANTIGRAVITY_CLIENT_SECRET === "string" ? env.ANTIGRAVITY_CLIENT_SECRET.trim() : "") ||
+    ANTIGRAVITY_PUBLIC_CONFIG.clientSecret;
+    
+  const isConfigured = Boolean(clientId && clientSecret);
   return { clientId, clientSecret, isConfigured };
 }
 

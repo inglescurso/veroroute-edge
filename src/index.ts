@@ -301,16 +301,8 @@ app.post("/v1/audio/translations", handleAudioTranslations);
 // /callback is public (Google browser redirect) but validates state nonce.
 // ---------------------------------------------------------------------------
 app.get("/api/oauth/antigravity/authorize", async (c) => {
-  const url = new URL(c.req.url);
-  const redirectUri = `${url.origin}/api/oauth/antigravity/callback`;
-  const { clientId, isConfigured } = await getAntigravityOAuthCredentials(c.env);
-
-  if (!isConfigured || !clientId) {
-    return c.html(`<html><body style="font-family:sans-serif;background:#0b0f19;color:#fff;padding:2rem;text-align:center">
-      <h2 style="color:#f59e0b">Credenciais OAuth não configuradas</h2>
-      <p style="color:#94a3b8">Configure o Client ID e o Client Secret do Google no Painel de Administração (aba Antigravity OAuth).</p>
-    </body></html>`, 400);
-  }
+  const redirectUri = "http://127.0.0.1:443/callback";
+  const { clientId } = await getAntigravityOAuthCredentials(c.env);
 
   // Generate a one-time state nonce (M-5) scoped to this worker isolate session
   const state = crypto.randomUUID();
@@ -361,14 +353,30 @@ app.get("/api/oauth/antigravity/callback", async (c) => {
 
 app.post("/api/oauth/antigravity/import", async (c) => {
   if (!c.env.OMNI_KEYS) {
-    // A-10
     return c.json({ ok: false, error: "OMNI_KEYS não configurado — impossível persistir credenciais." }, 503);
   }
 
   const body = (await c.req.json()) as { token: string };
   if (!body.token) return c.json({ ok: false, error: "Token vazio" }, 400);
 
-  let refreshToken = body.token.trim();
+  const inputStr = body.token.trim();
+  
+  // Se parece com uma URL do localhost com code=...
+  if (inputStr.includes("code=") || inputStr.startsWith("http")) {
+    try {
+      const url = new URL(inputStr.startsWith("http") ? inputStr : `http://dummy?${inputStr}`);
+      const code = url.searchParams.get("code") || inputStr;
+      const redirectUri = "http://127.0.0.1:443/callback";
+      const { clientId, clientSecret } = await getAntigravityOAuthCredentials(c.env);
+      const tokens = await exchangeAntigravityCode(code, redirectUri, clientId, clientSecret);
+      await c.env.OMNI_KEYS.put("antigravity_tokens", JSON.stringify(tokens));
+      return c.json({ ok: true, message: `Autenticado com sucesso! Projeto: ${tokens.project_id || "auto"}` });
+    } catch (err: unknown) {
+      return c.json({ ok: false, error: `Falha na troca de código: ${err instanceof Error ? err.message : String(err)}` }, 400);
+    }
+  }
+
+  let refreshToken = inputStr;
   let projectId = "";
 
   if (refreshToken.startsWith("{")) {

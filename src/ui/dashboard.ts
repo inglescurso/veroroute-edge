@@ -784,81 +784,41 @@ curl -X POST https://seu-worker.workers.dev/v1/search \\
             </div>
           </div>
           <div style="display: flex; gap: 0.75rem;">
-            <a id="agy-auth-btn" href="/api/oauth/antigravity/authorize" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-              🔗 Autorizar com Google
-            </a>
             <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="loadAntigravityStatus()">
               🔄 Atualizar Status
             </button>
           </div>
         </div>
 
-        <!-- Redirect URI Box -->
-        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 1.1rem; margin-bottom: 1.5rem;">
-          <div style="font-weight: 600; font-size: 0.88rem; color: var(--emerald); margin-bottom: 0.35rem;">
-            🌐 Authorized Redirect URI do seu Worker (Necessário no Google Cloud)
-          </div>
-          <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
-            <input type="text" id="agy-redirect-uri" readonly style="flex: 1; font-family: monospace; font-size: 0.8rem; background: rgba(0,0,0,0.3); color: #fff;" />
-            <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.45rem 0.85rem;" onclick="copyRedirectUri()">📋 Copiar URI</button>
-          </div>
-          <p style="color: var(--text-muted); font-size: 0.78rem; line-height: 1.4; margin: 0;">
-            O Google OAuth exige que a URL do seu Worker esteja explicitamente registrada na lista de <em>URIs de redirecionamento autorizados</em> no Google Cloud Console. Por esse motivo de segurança do Google, cada implantação deve registrar a sua URL exclusiva.
-          </p>
-        </div>
-
-        <!-- Passo a Passo Google Cloud Console Guide -->
-        <details style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
-          <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem; color: var(--primary);">
-            📖 Como criar seu Google OAuth Client ID gratuito (Guia Passo a Passo)
-          </summary>
-          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; margin-top: 0.75rem;">
-            <ol style="padding-left: 1.25rem; margin-bottom: 0.5rem;">
-              <li>Acesse o <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: var(--primary); text-decoration: underline;">Google Cloud Console → Credenciais</a> com sua conta Google.</li>
-              <li>Clique em <strong>+ Criar Credenciais</strong> e selecione <strong>ID do cliente OAuth</strong>.</li>
-              <li>Se solicitado, configure a tela de consentimento como "Externo" (basta preencher o nome do app e seu e-mail).</li>
-              <li>Em <em>Tipo de aplicativo</em>, escolha <strong>Aplicativo da Web</strong>.</li>
-              <li>Em <strong>URIs de redirecionamento autorizados</strong>, clique em <em>+ Adicionar URI</em> e cole o <strong>Authorized Redirect URI</strong> copiado acima.</li>
-              <li>Clique em <strong>Criar</strong>. O Google exibirá seu <strong>Client ID</strong> e <strong>Client Secret</strong>.</li>
-              <li>Cole os dois valores no formulário abaixo e clique em <strong>Salvar Credenciais no KV</strong>.</li>
-            </ol>
-            <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--amber); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.78rem; margin-top: 0.5rem;">
-              ⚡ <strong>Alternativa rápida sem criar nada no Google Cloud:</strong> Se você já tem o Antigravity CLI ou Gemini Code Assist logado no terminal, pule esta etapa e use a seção de <em>Importação Manual de Tokens</em> abaixo!
-            </div>
-          </div>
-        </details>
-
-        <!-- Credenciais OAuth Setup Form -->
+        <!-- Passo a Passo Autorização -->
         <div style="background: rgba(56, 189, 248, 0.03); border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.75rem;">
-          <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--primary);">⚙️ Configuração das Credenciais do Google OAuth</h4>
+          <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--primary);">⚙️ Como Autenticar (Headless OAuth)</h4>
           <p style="color: var(--text-muted); font-size: 0.82rem; line-height: 1.5; margin-bottom: 1rem;">
-            🔒 <strong>Por que configurar aqui?</strong> Para evitar bloqueios do <strong>GitHub Secret Scanning</strong> ao commitar no repositório, suas credenciais de OAuth são salvas de forma segura no <strong>Cloudflare KV (<code>OMNI_KEYS</code>)</strong> ou via <code>wrangler secret put</code>.
+            O login com Google não permite redirecionar de volta para este domínio automaticamente. Siga os passos abaixo:
           </p>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-            <div>
-              <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem;">Google OAuth Client ID:</label>
-              <input type="text" id="agy-input-client-id" placeholder="ex: 123456789-abcdef.apps.googleusercontent.com" style="width: 100%; font-size: 0.85rem;" />
-            </div>
-            <div>
-              <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem;">Google OAuth Client Secret:</label>
-              <input type="password" id="agy-input-client-secret" placeholder="ex: GOCSPX-xxxxxxxxxxxx" style="width: 100%; font-size: 0.85rem;" />
-            </div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; margin-top: 0.75rem;">
+            <ol style="padding-left: 1.25rem; margin-bottom: 1.5rem;">
+              <li style="margin-bottom: 0.5rem;">
+                <strong>Etapa 1:</strong> Abra este link no seu navegador para fazer o login no Google:
+                <br>
+                <a id="agy-auth-btn" href="/api/oauth/antigravity/authorize" target="_blank" class="btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; margin-top: 0.5rem; display: inline-block;">
+                  🔗 Abrir Página de Login do Google
+                </a>
+              </li>
+              <li style="margin-bottom: 0.5rem;">
+                <strong>Etapa 2:</strong> Após aprovar o login, o Google tentará redirecionar você para uma página <code>http://127.0.0.1</code> e exibirá um erro de <strong>"Não é possível acessar esse site"</strong> no navegador. Isso é esperado!
+              </li>
+              <li>
+                <strong>Etapa 3:</strong> Copie a <strong>URL completa</strong> que deu erro na barra de endereços do navegador (ou o código de autorização) e cole abaixo:
+              </li>
+            </ol>
           </div>
-          <button class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;" onclick="saveAntigravityConfig()">
-            💾 Salvar Credenciais no KV OMNI_KEYS
-          </button>
-        </div>
-
-        <!-- Importação Manual de Tokens -->
-        <div style="border-top: 1px solid var(--card-border); padding-top: 1.5rem;">
-          <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📥 Importação Manual de Tokens (Sem Navegador)</h4>
-          <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 0.75rem;">
-            Se você já utiliza o Antigravity CLI localmente, pode colar diretamente o conteúdo de <code>~/.config/antigravity/tokens.json</code> ou seu <code>refresh_token</code>:
-          </p>
-          <textarea id="agy-token-input" rows="3" placeholder='{"access_token": "...", "refresh_token": "...", "project_id": "..."}' style="font-size: 0.85rem; font-family: monospace;"></textarea>
-          <button class="btn btn-secondary" style="margin-top: 0.75rem; padding: 0.5rem 1.25rem; font-size: 0.85rem;" onclick="saveAgyToken()">
-            Salvar Tokens no Worker
-          </button>
+          <div>
+            <textarea id="agy-token-input" rows="2" placeholder="Cole aqui a URL que deu erro (ex: http://127.0.0.1:443/callback?state=...&code=4/0AX4Xf...)" style="font-size: 0.85rem; font-family: monospace; width: 100%; margin-bottom: 0.75rem;"></textarea>
+            <button class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;" onclick="saveAgyToken()">
+              Conectar Antigravity
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2564,11 +2524,7 @@ npx wrangler deploy
     async function loadAntigravityStatus() {
       const badge = document.getElementById('agy-badge-configured');
       const detail = document.getElementById('agy-detail-text');
-      const authBtn = document.getElementById('agy-auth-btn');
-      const redirectInput = document.getElementById('agy-redirect-uri');
-      if (redirectInput) {
-        redirectInput.value = window.location.origin + '/api/oauth/antigravity/callback';
-      }
+      
       if (!badge) return;
       try {
         const res = await adminFetch('/api/admin/antigravity/status');
@@ -2578,42 +2534,17 @@ npx wrangler deploy
           badge.style.background = 'rgba(16,185,129,0.15)';
           badge.style.color = 'var(--emerald)';
           badge.style.borderColor = 'rgba(16,185,129,0.3)';
-          detail.innerHTML = 'Client ID configurado (' + escapeHtml(data.maskedClientId) + ')' +
+          detail.innerHTML = 'Client ID ativo (' + escapeHtml(data.maskedClientId || 'embutido') + ')' +
             (data.hasTokens ? ' · <strong style="color:var(--emerald);">Tokens Ativos no KV</strong>' : ' · <span style="color:var(--amber);">Aguardando Autorização</span>');
-          if (authBtn) authBtn.style.opacity = '1';
         } else {
           badge.innerText = 'Credenciais Pendentes';
           badge.style.background = 'rgba(245,158,11,0.15)';
           badge.style.color = 'var(--amber)';
           badge.style.borderColor = 'rgba(245,158,11,0.3)';
-          detail.innerHTML = 'Insira o Client ID e Client Secret abaixo para salvar com segurança no KV OMNI_KEYS.';
+          detail.innerHTML = 'Client ID não configurado no código.';
         }
       } catch (e) {
         if (badge) badge.innerText = 'Erro ao verificar';
-      }
-    }
-
-    async function saveAntigravityConfig() {
-      const clientId = document.getElementById('agy-input-client-id').value.trim();
-      const clientSecret = document.getElementById('agy-input-client-secret').value.trim();
-      if (!clientId || !clientSecret) return showToast('Por favor, informe tanto o Client ID quanto o Client Secret.', 'error');
-
-      try {
-        const res = await adminFetch('/api/admin/antigravity/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId: clientId, clientSecret: clientSecret })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('Credenciais salvas com sucesso no KV OMNI_KEYS!', 'success');
-          document.getElementById('agy-input-client-secret').value = '';
-          loadAntigravityStatus();
-        } else {
-          showToast('Erro ao salvar: ' + (data.error ? data.error.message : 'Desconhecido'), 'error');
-        }
-      } catch (e) {
-        showToast('Erro: ' + e.message, 'error');
       }
     }
 
