@@ -2,4 +2,4 @@
 # The Deploy to Cloudflare flow must request ONLY this value.
 # After deployment, open Administration and add provider API keys there.
 # Generate a strong token, for example: openssl rand -hex 32
-# AUTH_TOKEN=
+AUTH_TOKEN=
