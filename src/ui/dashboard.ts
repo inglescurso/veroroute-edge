@@ -2808,9 +2808,10 @@ npx wrangler deploy
 
     async function testCombo(comboId) {
       const c = currentCombos[comboId];
-      if (!c || !c.targets || c.targets.length === 0) return showToast('Este combo não possui modelos para testar.', 'info');
+      const targets = c?.providers || c?.targets || [];
+      if (targets.length === 0) return showToast('Este combo não possui modelos para testar.', 'info');
 
-      c.targets.forEach(function(_, idx) {
+      targets.forEach(function(_, idx) {
         const badge = document.getElementById('test-badge-' + comboId + '-' + idx);
         if (badge) {
           badge.className = 'badge-latency';
