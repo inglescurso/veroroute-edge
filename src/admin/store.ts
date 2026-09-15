@@ -316,9 +316,11 @@ export function slugifyProviderId(name: string): string {
     .slice(0, 32) || "provider";
 }
 
+const inMemoryCredentials: Record<string, ProviderCredential[]> = {};
+
 export async function getStoredProviderCredentials(env: EnvBindings, providerId: string): Promise<ProviderCredential[]> {
   const kv = env.OMNI_KEYS;
-  if (!kv) return [];
+  if (!kv) return inMemoryCredentials[providerId] || [];
   const raw = await kv.get("credentials_" + providerId);
   if (raw) {
     try {
@@ -340,12 +342,13 @@ export async function setStoredProviderCredentials(
   credentials: ProviderCredential[]
 ): Promise<void> {
   const kv = env.OMNI_KEYS;
-  if (!kv) return;
   const clean = credentials
     .map((item) => ({ apiKey: item.apiKey.trim() }))
     .filter((item) => item.apiKey);
   const unique = Array.from(new Map(clean.map((item) => [item.apiKey, item])).values());
-  if (unique.length === 0) {
+  if (!kv) {
+    inMemoryCredentials[providerId] = unique;
+  } else if (unique.length === 0) {
     await Promise.all([kv.delete("credentials_" + providerId), kv.delete(KV_CUSTOM_KEYS_PREFIX + providerId)]);
   } else {
     await Promise.all([

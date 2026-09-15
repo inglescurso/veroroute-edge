@@ -355,10 +355,6 @@ app.get("/api/oauth/antigravity/callback", async (c) => {
 });
 
 app.post("/api/oauth/antigravity/import", async (c) => {
-  if (!c.env.OMNI_KEYS) {
-    return c.json({ ok: false, error: "OMNI_KEYS não configurado — impossível persistir credenciais." }, 503);
-  }
-
   const body = (await c.req.json()) as { token: string };
   if (!body.token) return c.json({ ok: false, error: "Token vazio" }, 400);
 

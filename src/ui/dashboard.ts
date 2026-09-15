@@ -1703,7 +1703,7 @@ npx wrangler deploy
       opts = opts || {};
       opts.headers = Object.assign({ 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, opts.headers || {});
       var res = await fetch(url, opts);
-      if (res.status === 401 || res.status === 503) {
+      if (res.status === 401) {
         clearAdminToken();
         var errEl = document.getElementById('admin-auth-error');
         if (errEl) {
