@@ -75,7 +75,7 @@ app.use(
 // ---------------------------------------------------------------------------
 app.use("/v1/*", async (c, next) => {
   const token = extractBearer(c);
-  const principal = await resolvePrincipal(c, token);
+  const principal = await resolvePrincipal(c, c.env, token);
   if (!principal) return unauthorized();
   c.set("principal", principal);
   // Record usage non-blocking
@@ -89,13 +89,13 @@ app.use("/v1/*", async (c, next) => {
 // /authorize and /import require the admin Bearer.
 // ---------------------------------------------------------------------------
 app.use("/api/oauth/antigravity/authorize", async (c, next) => {
-  const principal = await resolvePrincipal(c, extractBearer(c));
+  const principal = await resolvePrincipal(c, c.env, extractBearer(c));
   if (!principal || principal.kind !== "master") return unauthorized();
   return next();
 });
 
 app.use("/api/oauth/antigravity/import", async (c, next) => {
-  const principal = await resolvePrincipal(c, extractBearer(c));
+  const principal = await resolvePrincipal(c, c.env, extractBearer(c));
   if (!principal || principal.kind !== "master") return unauthorized();
   return next();
 });
@@ -107,7 +107,7 @@ app.use("/api/mcp/*", async (c, next) => {
   if (c.env.ENABLE_MCP_SERVER !== "true") {
     return c.json({ error: { message: "Servidor MCP desabilitado. Defina ENABLE_MCP_SERVER=true para habilitar." } }, 404);
   }
-  const principal = await resolvePrincipal(c, extractBearer(c));
+  const principal = await resolvePrincipal(c, c.env, extractBearer(c));
   if (!principal) return unauthorized();
   return next();
 });

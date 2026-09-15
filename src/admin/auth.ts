@@ -11,9 +11,14 @@ export type AuthPrincipal =
 type AnyCtx = Context<{ Bindings: EnvBindings; Variables: any }>;
 
 export function extractBearer(c: AnyCtx): string {
-  const h = c.req.header("Authorization") ?? "";
-  return h.replace(/^Bearer\s+/i, "").trim();
+  const h = c.req.header("Authorization") || "";
+  if (h.startsWith("Bearer ")) return h.slice(7).trim();
+  const q = c.req.query("token");
+  if (q) return q.trim();
+  return "";
 }
+
+
 
 export async function resolvePrincipal(
   c: AnyCtx,
