@@ -7,6 +7,7 @@ import {
   slugifyProviderId,
   appendProviderKeys,
   appendProviderCredentials,
+  getStoredProviderCredentials,
   setStoredProviderCredentials,
   removeProviderKeys,
   getCustomProviderKeys,
@@ -95,6 +96,7 @@ adminRouter.get("/config", async (c) => {
 
   return c.json({
     providers,
+    hasKV: Boolean(c.env.OMNI_KEYS),
     providerStates: cfg.providerStates,
     modelStates: cfg.modelStates,
     customModels: cfg.customModels,
@@ -267,7 +269,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       };
 
       if (id === "pollinations") {
-        url = "https://text.pollinations.ai/models";
+        url = "https://gen.pollinations.ai/models";
       } else if (id === "gemini") {
         if (apiKey) {
           url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
@@ -291,18 +293,26 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       } else if (apiKey) {
         // Assume OpenAI compatible se não foi tratado acima
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
-        if ((prov?.protocol === "openai" || id === "cheaperinference") && !cleanedUrl.endsWith("/v1")) {
-          cleanedUrl += "/v1";
+        if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
+          if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
+          url = cleanedUrl + "/models";
+        } else if (!cleanedUrl.endsWith("/models")) {
+          url = cleanedUrl + "/models";
+        } else {
+          url = cleanedUrl;
         }
-        url = cleanedUrl + "/models";
         headers["Authorization"] = `Bearer ${apiKey}`;
       } else {
         // Se a chave estiver vazia, ainda podemos tentar bater no endpoint pra ver se é público
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
-        if ((prov?.protocol === "openai" || id === "cheaperinference") && !cleanedUrl.endsWith("/v1")) {
-          cleanedUrl += "/v1";
+        if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
+          if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
+          url = cleanedUrl + "/models";
+        } else if (!cleanedUrl.endsWith("/models")) {
+          url = cleanedUrl + "/models";
+        } else {
+          url = cleanedUrl;
         }
-        url = cleanedUrl + "/models";
       }
 
       if (url) {
@@ -789,10 +799,8 @@ adminRouter.post("/combos/test", async (c) => {
 // ---------------------------------------------------------------------------
 adminRouter.get("/antigravity/status", async (c) => {
   const { clientId, isConfigured } = await getAntigravityOAuthCredentials(c.env);
-  let hasTokens = false;
-  if (c.env.OMNI_KEYS) {
-    hasTokens = Boolean(await c.env.OMNI_KEYS.get("antigravity_tokens"));
-  }
+  const creds = await getStoredProviderCredentials(c.env, "antigravity");
+  const hasTokens = creds && creds.length > 0;
   return c.json({ ok: true, isConfigured, hasClientId: Boolean(clientId), maskedClientId: maskSecret(clientId), hasTokens });
 });
 

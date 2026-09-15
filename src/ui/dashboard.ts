@@ -979,7 +979,7 @@ dsh --model combo-super-payload
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.35rem;">
               Upstream Oficial: <a href="${UPSTREAM_REPO_URL}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 600; text-decoration: none;">${UPSTREAM_REPO_NAME} ↗</a> · Autor: <strong>${UPSTREAM_AUTHOR}</strong>
             </p>
-            <p style="color: #64748b; font-size: 0.8rem; line-height: 1.4;">
+            <p id="kv-status-message" style="color: #64748b; font-size: 0.8rem; line-height: 1.4;">
               Esta instância serverless roda sobre Cloudflare Workers & KV. Todas as credenciais cadastradas abaixo persistem no namespace <code>OMNI_KEYS</code> mesmo após atualizações do código upstream.
             </p>
           </div>
@@ -1844,6 +1844,19 @@ npx wrangler deploy
         window._providersData = data.providers || [];
         renderAdminProviders(window._providersData);
         if (statusEl) statusEl.innerText = window._providersData.length + ' provedores carregados';
+        
+        const kvStatusEl = document.getElementById('kv-status-message');
+        if (kvStatusEl) {
+          if (data.hasKV) {
+            kvStatusEl.innerHTML = 'Esta instância serverless roda sobre Cloudflare Workers & KV. Todas as credenciais cadastradas abaixo persistem no namespace <code>OMNI_KEYS</code> mesmo após atualizações do código upstream.';
+            kvStatusEl.style.color = '#64748b';
+            kvStatusEl.style.fontWeight = 'normal';
+          } else {
+            kvStatusEl.innerHTML = '⚠️ <strong>ALERTA DE MEMÓRIA VOLÁTIL:</strong> O banco de dados KV (OMNI_KEYS) não foi encontrado ou não está vinculado. O sistema está rodando com armazenamento "em memória". <strong>Todas as configurações e chaves serão PERDIDAS quando o Worker reiniciar</strong> (por inatividade ou atualização do GitHub). Leia as instruções do README para vincular o seu KV no wrangler.toml.';
+            kvStatusEl.style.color = '#f43f5e';
+            kvStatusEl.style.fontWeight = '500';
+          }
+        }
       } catch (e) {
         if (statusEl) statusEl.innerText = 'Erro: ' + e.message;
       }
