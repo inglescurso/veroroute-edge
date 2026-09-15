@@ -31,7 +31,7 @@ export const adminRouter = new Hono<{ Bindings: EnvBindings; Variables: any }>()
 // ---------------------------------------------------------------------------
 adminRouter.use("*", async (c, next) => {
   const token = extractBearer(c);
-  const principal = await resolvePrincipal(c, c.env, token);
+  const principal = await resolvePrincipal(c, token);
   if (!principal || principal.kind !== "master") {
     return unauthorized();
   }

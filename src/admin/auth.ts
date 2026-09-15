@@ -11,47 +11,24 @@ export type AuthPrincipal =
 type AnyCtx = Context<{ Bindings: EnvBindings; Variables: any }>;
 
 export function extractBearer(c: AnyCtx): string {
-  const h = c.req.header("Authorization") || "";
-  if (h.startsWith("Bearer ")) return h.slice(7).trim();
-  const q = c.req.query("token");
-  if (q) return q.trim();
-  return "";
-}
-
-// B3: Timing-safe comparison using crypto.subtle (Workers runtime)
-async function timingSafeEqual(a: string, b: string): Promise<boolean> {
-  const enc = new TextEncoder();
-  const aBytes = enc.encode(a);
-  const bBytes = enc.encode(b);
-  // Hash both to fixed-length to avoid length leak, then compare
-  const [aHash, bHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", aBytes),
-    crypto.subtle.digest("SHA-256", bBytes),
-  ]);
-  const aArr = new Uint8Array(aHash);
-  const bArr = new Uint8Array(bHash);
-  if (aArr.length !== bArr.length) return false;
-  // Constant-time compare
-  let diff = 0;
-  for (let i = 0; i < aArr.length; i++) diff |= aArr[i] ^ bArr[i];
-  return diff === 0;
+  const h = c.req.header("Authorization") ?? "";
+  return h.replace(/^Bearer\s+/i, "").trim();
 }
 
 export async function resolvePrincipal(
   c: AnyCtx,
-  env: EnvBindings,
   token: string
 ): Promise<AuthPrincipal | null> {
-  const master = env.AUTH_TOKEN || "admin";
+  const master = c.env.AUTH_TOKEN;
+  if (!master) return null;
 
-  // Check master token (timing-safe)
-  if (token && await timingSafeEqual(token, master)) {
+  if (token && token === master) {
     return { kind: "master", id: "master" };
   }
 
   // Check virtual keys
   if (token.startsWith("sk-vr-")) {
-    const cfg = await getAdminConfig(env);
+    const cfg = await getAdminConfig(c.env);
     const vk = cfg.virtualKeys?.[token];
     if (vk && vk.enabled !== false) {
       return {
