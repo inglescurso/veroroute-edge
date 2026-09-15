@@ -1344,6 +1344,9 @@ dsh --model combo-super-payload
             <button type="button" id="mpm-btn-fetch" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.72rem;" onclick="fetchAvailableModels()">
               🔄 Recarregar
             </button>
+            <button type="button" id="mpm-btn-test" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.72rem; color: var(--emerald); border-color: rgba(16, 185, 129, 0.3);" onclick="testProviderModels()">
+              ⚡ Testar Modelos
+            </button>
           </div>
         </div>
 

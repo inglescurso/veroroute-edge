@@ -31,7 +31,7 @@ export const adminRouter = new Hono<{ Bindings: EnvBindings; Variables: any }>()
 // ---------------------------------------------------------------------------
 adminRouter.use("*", async (c, next) => {
   const token = extractBearer(c);
-  const principal = await resolvePrincipal(c, c.env, token);
+  const principal = await resolvePrincipal(c, token);
   if (!principal || principal.kind !== "master") {
     return unauthorized();
   }
@@ -274,8 +274,6 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         } else {
           url = ""; // sem chave gemini, cai no catálogo
         }
-      } else if (id === "1min" || id === "azure" || id === "bedrock" || id === "antigravity") {
-        url = ""; // nao possuem endpoint padrao /models documentado ou precisam de URL especifica
       } else if (id === "openrouter" || id === "openrouter-free") {
         url = "https://openrouter.ai/api/v1/models";
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
@@ -338,6 +336,66 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     fetchError,
     activeModels: Array.from(new Set([...registryModels, ...activeCustomModels])).filter(m => !removedModels.includes(m)),
   });
+});
+
+adminRouter.post("/providers/:id/test-models", async (c) => {
+  const id = c.req.param("id");
+  const cfg = await getAdminConfig(c.env);
+  const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id];
+  const activeCustomModels = cfg.customModels[id] || [];
+  const registryModels = prov?.models || [];
+  const removedModels = cfg.removedModels?.[id] || [];
+
+  const allAvailable = Array.from(new Set([...registryModels, ...activeCustomModels]))
+    .filter((m) => !removedModels.includes(m));
+
+  // Limitar testes para não sobrecarregar
+  const testModels = allAvailable.slice(0, 3);
+  
+  if (testModels.length === 0) {
+    return c.json({ ok: false, results: [] });
+  }
+
+  const credential = await selectActiveCredential(c.env, id);
+  const apiKey = credential.apiKey;
+  if (!apiKey && id !== "cloudflare-ai") {
+    return c.json({ error: { message: "Sem chave de API para testar", type: "auth" } }, 401);
+  }
+
+  const COMBO_TEST_TIMEOUT_MS = 12000;
+  
+  const testTarget = async (model: string) => {
+    const testReq = {
+      model,
+      messages: [{ role: "user" as const, content: "Respond with OK" }],
+      max_tokens: 5,
+      temperature: 0,
+      stream: false,
+    };
+    const start = Date.now();
+    try {
+      const res = await Promise.race([
+        executeOpenAICompatible(testReq, id, apiKey, model),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
+      ]);
+      const latency = Date.now() - start;
+      if (res.ok) {
+        let text = "OK";
+        try {
+          const j = (await res.json()) as any;
+          text = j.choices?.[0]?.message?.content?.trim().slice(0, 30) || "OK";
+        } catch { /* stream/ignore */ }
+        return { provider: id, model, status: res.status, latency_ms: latency, success: true, output: text };
+      }
+      const errText = (await res.text()).slice(0, 150);
+      return { provider: id, model, status: res.status, latency_ms: latency, success: false, error: errText };
+    } catch (err: unknown) {
+      return { provider: id, model, status: 500, latency_ms: Date.now() - start, success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const results = await Promise.all(testModels.map(testTarget));
+  return c.json({ ok: true, results });
 });
 
 adminRouter.delete("/providers/:id/models", async (c) => {
