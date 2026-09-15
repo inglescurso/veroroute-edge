@@ -275,8 +275,8 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         } else {
           url = ""; // sem chave gemini, cai no catálogo
         }
-      } else if (id === "1min") {
-        url = ""; // 1min.ai nao possui endpoint padrao /models documentado
+      } else if (id === "1min" || id === "azure" || id === "bedrock" || id === "antigravity") {
+        url = ""; // nao possuem endpoint padrao /models documentado ou precisam de URL especifica
       } else if (id === "openrouter" || id === "openrouter-free") {
         url = "https://openrouter.ai/api/v1/models";
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
@@ -318,11 +318,13 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
 
   // 2. Combinar com catálogo conhecido do provedor e fallbacks ricos
   const activeCustomModels = cfg.customModels[id] || [];
+  const registryModels = prov?.models || [];
 
   // Combina sem duplicatas
   const allAvailable = Array.from(
     new Set([
       ...upstreamModels,
+      ...registryModels,
       ...activeCustomModels,
     ])
   );
