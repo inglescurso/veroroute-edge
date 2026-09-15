@@ -12,7 +12,10 @@ type AnyCtx = Context<{ Bindings: EnvBindings; Variables: any }>;
 
 export function extractBearer(c: AnyCtx): string {
   const h = c.req.header("Authorization") || "";
-  return h.startsWith("Bearer ") ? h.slice(7).trim() : "";
+  if (h.startsWith("Bearer ")) return h.slice(7).trim();
+  const q = c.req.query("token");
+  if (q) return q.trim();
+  return "";
 }
 
 // B3: Timing-safe comparison using crypto.subtle (Workers runtime)

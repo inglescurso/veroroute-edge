@@ -2524,7 +2524,12 @@ npx wrangler deploy
     async function loadAntigravityStatus() {
       const badge = document.getElementById('agy-badge-configured');
       const detail = document.getElementById('agy-detail-text');
+      const authBtn = document.getElementById('agy-auth-btn');
       
+      if (authBtn) {
+        authBtn.href = '/api/oauth/antigravity/authorize?token=' + encodeURIComponent(getStoredToken());
+      }
+
       if (!badge) return;
       try {
         const res = await adminFetch('/api/admin/antigravity/status');
