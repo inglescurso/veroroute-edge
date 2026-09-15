@@ -15,7 +15,6 @@ binding = "OMNI_KEYS"
 id = ""
 
 [vars]
-AUTH_TOKEN = ""
 SEARXNG_URL = "opcional"
 DEFAULT_ROUTING_STRATEGY = "priority"
 DEFAULT_OUTPUT_STYLE = "none"
