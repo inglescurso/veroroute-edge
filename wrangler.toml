@@ -1,0 +1,34 @@
+name = "veroroute-edge"
+main = "src/index.ts"
+compatibility_date = "2025-02-24"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "OMNI_CACHE"
+id = ""
+
+[[kv_namespaces]]
+binding = "OMNI_KEYS"
+id = ""
+
+[vars]
+AUTH_TOKEN = ""
+DEFAULT_ROUTING_STRATEGY = "priority"
+DEFAULT_OUTPUT_STYLE = "none"
+ENABLE_MODALITY_BRIDGE = "true"
+ENABLE_CONTEXT_COMPRESSION = "true"
+ENABLE_JINA_READER = "true"
+ENABLE_MCP_SERVER = "false"
+ENABLE_QUOTA_SHARING = "false"
+MAX_RETRIES = "3"
+RETRY_DELAY_MS = "1000"
+CASCADE_TIMEOUT_MS = "45000"
+CACHE_TTL_SECONDS = "3600"
+QUOTA_MAX_REQUESTS = "1000"
+QUOTA_WINDOW_SECONDS = "60"
+
+[observability]
+enabled = true
