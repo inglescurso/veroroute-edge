@@ -336,7 +336,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     upstreamCount: upstreamModels.length,
     hasUpstream: upstreamModels.length > 0,
     fetchError,
-    activeModels: prov?.models || activeCustomModels,
+    activeModels: Array.from(new Set([...registryModels, ...activeCustomModels])).filter(m => !removedModels.includes(m)),
   });
 });
 

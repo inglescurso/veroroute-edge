@@ -1272,9 +1272,12 @@ dsh --model combo-super-payload
         <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.85rem;" onclick="closeAdminAuthModal()">✕</button>
       </div>
 
-      <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.2rem;">
+      <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.8rem;">
         Insira a chave secreta <code>AUTH_TOKEN</code> configurada no seu Cloudflare Worker para acessar e gerenciar provedores, modelos, chaves e combos.
       </p>
+      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.6rem; border-radius: 6px; margin-bottom: 1.2rem;">
+        <span style="color: var(--amber); font-size: 0.75rem;"><strong>Dica:</strong> Se você não configurou o Secret na Cloudflare, a senha padrão é <code>admin</code>.</span>
+      </div>
 
       <div style="margin-bottom: 1rem;">
         <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.4rem;">
@@ -1699,12 +1702,15 @@ npx wrangler deploy
       var res = await fetch(url, opts);
       if (res.status === 401 || res.status === 503) {
         clearAdminToken();
-        showToast('AUTH_TOKEN inválido ou não autorizado.', 'error');
-        openAdminAuthModal();
         var errEl = document.getElementById('admin-auth-error');
         if (errEl) {
           errEl.innerText = 'AUTH_TOKEN inválido ou rejeitado pelo servidor.';
           errEl.style.display = 'block';
+        }
+        var modal = document.getElementById('modal-admin-auth');
+        if (!modal || !modal.classList.contains('active')) {
+          showToast('AUTH_TOKEN inválido ou não autorizado.', 'error');
+          openAdminAuthModal();
         }
         throw new Error('AUTH_TOKEN inválido.');
       }

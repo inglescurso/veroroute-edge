@@ -68,7 +68,9 @@ an external provider key.
 Environment variables such as `OPENAI_API_KEYS` remain supported only as an
 optional advanced/legacy alternative.
 
-### Manual CLI Deployment
+### Manual CLI Deployment (Recommended)
+
+To ensure a safe deployment where all configurations and secrets are properly set up before using the application, follow this exact order:
 
 ```bash
 # 1. Clone repository
@@ -82,13 +84,16 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Update wrangler.toml with your KV namespace IDs
+# 4. Update wrangler.toml
+# Replace the empty `id = ""` strings with your generated KV IDs from step 3.
 
-# 5. Set mandatory master AUTH_TOKEN secret
-npx wrangler secret put AUTH_TOKEN
-
-# 6. Deploy to Cloudflare Workers
+# 5. Deploy to Cloudflare Workers
+# You must deploy first before adding secrets if this is your first time.
 npx wrangler deploy
+
+# 6. Set mandatory master AUTH_TOKEN secret
+# Type a strong password and hit Enter when prompted.
+npx wrangler secret put AUTH_TOKEN
 ```
 
 ### 🔄 Staying Updated with the Official Upstream
@@ -196,7 +201,9 @@ Implante diretamente na sua conta do Cloudflare Workers com apenas um clique:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/samucamg/veroroute-edge)
 
-### Implantação Manual via CLI
+### Implantação Manual via CLI (Recomendado)
+
+O fluxo ideal para implantação manual segura via CLI garante que nenhuma configuração falte antes de usar a aplicação. Siga os passos na ordem correta:
 
 ```bash
 # 1. Clonar repositório
@@ -210,13 +217,16 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Atualizar o arquivo wrangler.toml com os IDs gerados do KV
+# 4. Atualizar o arquivo wrangler.toml
+# Substitua as strings vazias `id = ""` pelos IDs gerados no passo 3.
 
-# 5. Definir a chave mestre AUTH_TOKEN
-npx wrangler secret put AUTH_TOKEN
-
-# 6. Realizar o deploy no Cloudflare Workers
+# 5. Realizar o deploy no Cloudflare Workers
+# É importante fazer o deploy antes de configurar os secrets (se for a primeira vez).
 npx wrangler deploy
+
+# 6. Definir a chave mestre AUTH_TOKEN
+# Digite uma senha forte e pressione Enter quando solicitado.
+npx wrangler secret put AUTH_TOKEN
 ```
 
 ### 🔄 Como Manter sua Instância Atualizada com o Upstream Oficial
