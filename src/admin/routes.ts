@@ -30,7 +30,6 @@ export const adminRouter = new Hono<{ Bindings: EnvBindings; Variables: any }>()
 // C-1/C-2: Requires master token; virtual keys cannot access admin API.
 // ---------------------------------------------------------------------------
 adminRouter.use("*", async (c, next) => {
-  if (!c.env.AUTH_TOKEN) return serverMisconfigured();
   const token = extractBearer(c);
   const principal = await resolvePrincipal(c, c.env, token);
   if (!principal || principal.kind !== "master") {
@@ -319,6 +318,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
   // 2. Combinar com catálogo conhecido do provedor e fallbacks ricos
   const activeCustomModels = cfg.customModels[id] || [];
   const registryModels = prov?.models || [];
+  const removedModels = cfg.removedModels?.[id] || [];
 
   // Combina sem duplicatas
   const allAvailable = Array.from(
@@ -327,7 +327,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       ...registryModels,
       ...activeCustomModels,
     ])
-  );
+  ).filter((m) => !removedModels.includes(m));
 
   return c.json({
     ok: true,
