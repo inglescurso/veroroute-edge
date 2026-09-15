@@ -6,14 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 [ai]
 binding = "AI"
 
-[[kv_namespaces]]
-binding = "OMNI_CACHE"
-id = ""
-
-[[kv_namespaces]]
-binding = "OMNI_KEYS"
-id = ""
-
 [vars]
 SEARXNG_URL = "opcional"
 DEFAULT_ROUTING_STRATEGY = "priority"
