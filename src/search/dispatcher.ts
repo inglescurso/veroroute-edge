@@ -32,6 +32,7 @@ export async function dispatchSearch(
   if (
     searxUrl &&
     searxUrl.length > 0 &&
+    searxUrl.toLowerCase() !== "opcional" &&
     (requestedProvider === "auto" || requestedProvider === "searxng")
   ) {
     try {
