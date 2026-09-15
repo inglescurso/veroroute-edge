@@ -277,13 +277,32 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       } else if (id === "openrouter" || id === "openrouter-free") {
         url = "https://openrouter.ai/api/v1/models";
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+      } else if (id === "1min") {
+        url = "https://api.1min.ai/v1/models";
+        headers[headerName || "API-KEY"] = apiKey || "";
+      } else if (id === "azure") {
+        url = baseUrl.replace(/\/+$/, "") + "/models?api-version=2024-02-15-preview";
+        headers["api-key"] = apiKey || "";
       } else if (authType === "anthropic" || (prov && "protocol" in prov && prov.protocol === "anthropic")) {
         headers["x-api-key"] = apiKey || "";
         headers["anthropic-version"] = "2023-06-01";
       } else if (authType === "apikey-header") {
-        headers[headerName] = apiKey || "";
+        headers[headerName || "api-key"] = apiKey || "";
       } else if (apiKey) {
+        // Assume OpenAI compatible se não foi tratado acima
+        let cleanedUrl = baseUrl.replace(/\/+$/, "");
+        if ((prov?.protocol === "openai" || id === "cheaperinference") && !cleanedUrl.endsWith("/v1")) {
+          cleanedUrl += "/v1";
+        }
+        url = cleanedUrl + "/models";
         headers["Authorization"] = `Bearer ${apiKey}`;
+      } else {
+        // Se a chave estiver vazia, ainda podemos tentar bater no endpoint pra ver se é público
+        let cleanedUrl = baseUrl.replace(/\/+$/, "");
+        if ((prov?.protocol === "openai" || id === "cheaperinference") && !cleanedUrl.endsWith("/v1")) {
+          cleanedUrl += "/v1";
+        }
+        url = cleanedUrl + "/models";
       }
 
       if (url) {
@@ -374,16 +393,37 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
     };
     const start = Date.now();
     try {
-      const res = await Promise.race([
-        executeOpenAICompatible(testReq, id, apiKey, model),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
-      ]);
+      let res: Response;
+      
+      if (id === "antigravity") {
+        const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
+        const { executeAntigravityRequest } = await import("@/adapters/antigravity");
+        
+        const antigravResult = await getValidAntigravityAccessToken(c.env);
+        if (!antigravResult?.accessToken) throw new Error("Antigravity: no valid access token");
+        
+        // Simular um pedido para o Antigravity
+        res = await Promise.race([
+          executeAntigravityRequest(testReq as any, antigravResult.accessToken, antigravResult.projectId || "", model),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
+        ]) as Response;
+      } else {
+        res = await Promise.race([
+          executeOpenAICompatible(testReq, id, apiKey, model),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
+        ]) as Response;
+      }
+
       const latency = Date.now() - start;
       if (res.ok) {
         let text = "OK";
         try {
           const j = (await res.json()) as any;
-          text = j.choices?.[0]?.message?.content?.trim().slice(0, 30) || "OK";
+          if (id === "antigravity" || model.includes("gemini")) {
+            text = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 30) || "OK";
+          } else {
+            text = j.choices?.[0]?.message?.content?.trim().slice(0, 30) || "OK";
+          }
         } catch { /* stream/ignore */ }
         return { provider: id, model, status: res.status, latency_ms: latency, success: true, output: text };
       }
