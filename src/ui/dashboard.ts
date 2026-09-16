@@ -1315,6 +1315,12 @@ dsh --model combo-super-payload
         <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.85rem;" onclick="closeProviderModelsModal()">✕</button>
       </div>
 
+      <!-- Alerta se não houver chaves para o provedor -->
+      <div id="mpm-key-warning" style="display:none; background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.25); border-radius:8px; padding:0.55rem 0.85rem; margin-bottom:1rem; font-size:0.78rem; color:var(--amber); justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <span>⚠️ Nenhuma chave de API salva para este provedor.</span>
+        <button type="button" class="btn btn-secondary" style="padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--amber); border-color:rgba(245, 158, 11, 0.4);" onclick="openProviderKeysModalFromModels()">🔑 Cadastrar Chave</button>
+      </div>
+
       <!-- Modelos Atualmente Ativos -->
       <div style="margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -2040,12 +2046,24 @@ git push origin master
       if (pid) openProviderModelsModal(pid);
     }
 
+    function openProviderKeysModalFromModels() {
+      var pid = activeModalProviderId;
+      closeProviderModelsModal();
+      if (pid) openProviderKeysModal(pid);
+    }
+
     // Gerenciador de Modelos
     function openProviderModelsModal(providerId) {
       activeModalProviderId = providerId;
       var p = (window._providersData || []).find(function(x) { return x.id === providerId; });
       var provName = p ? p.name : providerId;
       document.getElementById('mpm-title').innerText = '🤖 Modelos: ' + provName;
+
+      var warnEl = document.getElementById('mpm-key-warning');
+      if (warnEl) {
+        var needsKey = p && (p.keyCount === 0 || !p.keyCount) && providerId !== 'cloudflare-ai' && providerId !== 'antigravity' && providerId !== 'pollinations' && providerId !== 'freeapikey';
+        warnEl.style.display = needsKey ? 'flex' : 'none';
+      }
 
       renderActiveModelsList();
 
@@ -2142,9 +2160,13 @@ git push origin master
           var activeSet = new Set((p && p.models) ? p.models : []);
 
           if (status) {
-            status.innerHTML = (data.hasUpstream
-              ? '<span style="color:var(--emerald); font-weight:600;">✓ ' + data.upstreamCount + ' modelos retornados pela API oficial!</span>'
-              : '<span style="color:var(--amber);">Catálogo de modelos recomendados para este provedor.</span>');
+            if (data.hasUpstream) {
+              status.innerHTML = '<span style="color:var(--emerald); font-weight:600;">✓ ' + data.upstreamCount + ' modelos retornados pela API oficial!</span>';
+            } else if (data.fetchError) {
+              status.innerHTML = '<span style="color:var(--amber); font-weight:500;">Catálogo ativo (' + escapeHtml(data.fetchError) + ')</span>';
+            } else {
+              status.innerHTML = '<span style="color:var(--amber);">Catálogo de modelos recomendados para este provedor.</span>';
+            }
           }
 
           data.models.forEach(function(m) {
@@ -2172,6 +2194,70 @@ git push origin master
           btn.innerText = '🔄 Recarregar';
         }
         if (status) status.innerText = 'Erro ao buscar modelos: ' + e.message;
+      }
+    }
+
+    async function testProviderModels() {
+      if (!activeModalProviderId) return;
+      var btn = document.getElementById('mpm-btn-test');
+      var originalText = btn ? btn.innerText : '⚡ Testar Modelos';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ Testando...';
+      }
+      showToast('Testando modelos do provedor ' + activeModalProviderId + '...', 'info');
+
+      try {
+        var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/test-models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        var data = await res.json();
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }
+
+        if (data.ok && data.results && data.results.length > 0) {
+          var okCount = 0;
+          data.results.forEach(function(r) {
+            if (r.success) okCount++;
+            var itemEl = document.querySelector('#mpm-discovered-list .model-select-item[data-model-name="' + r.model + '"]');
+            if (itemEl) {
+              var oldBadge = itemEl.querySelector('.model-test-badge');
+              if (oldBadge) oldBadge.remove();
+              var badge = document.createElement('span');
+              badge.className = 'model-test-badge badge-latency ' + (r.success ? 'ok' : 'err');
+              badge.style.fontSize = '0.7rem';
+              badge.style.marginLeft = '0.4rem';
+              if (r.success) {
+                badge.innerText = '⚡ ' + r.latency_ms + 'ms · OK';
+              } else {
+                var errBrief = r.status === 401 ? 'Sem Chave' : (r.status === 500 ? 'Erro 500' : 'Falhou (' + r.status + ')');
+                badge.innerText = '❌ ' + errBrief;
+                badge.title = r.error || 'Falha no teste';
+              }
+              itemEl.appendChild(badge);
+            }
+          });
+
+          if (okCount > 0) {
+            showToast('✅ ' + okCount + '/' + data.results.length + ' modelo(s) responderam com sucesso!', 'success');
+          } else {
+            var firstErr = (data.results[0] && data.results[0].error) ? data.results[0].error : (data.results[0] && data.results[0].status === 401 ? 'Chave de API não configurada' : 'Falha ao testar modelos');
+            showToast('❌ Falha nos testes: ' + firstErr, 'error');
+          }
+        } else {
+          var errMsg = (data.error && data.error.message) ? data.error.message : (data.message || 'Nenhum resultado de teste retornado');
+          showToast('❌ ' + errMsg, 'error');
+        }
+      } catch (e) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }
+        showToast('Erro ao testar modelos: ' + e.message, 'error');
       }
     }
 

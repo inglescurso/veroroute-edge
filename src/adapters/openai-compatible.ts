@@ -134,7 +134,15 @@ export async function executeOpenAICompatible(
     }
   }
 
-  const endpoint = `${provider.baseUrl}/chat/completions`;
+  const rawBase = provider.baseUrl || "";
+  let endpoint = `${rawBase}/chat/completions`;
+  if (providerId === "azure") {
+    const cleanAzureBase = rawBase.replace(/\/+$/, "");
+    const apiVersion = "2024-02-15-preview";
+    endpoint = `${cleanAzureBase}/openai/deployments/${targetModel}/chat/completions?api-version=${apiVersion}`;
+    headers["api-key"] = apiKey;
+    delete headers["Authorization"];
+  }
   const bodyPayload = {
     ...request,
     model: targetModel,

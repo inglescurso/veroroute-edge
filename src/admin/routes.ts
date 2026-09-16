@@ -16,6 +16,8 @@ import {
 } from "./store";
 import { extractBearer, resolvePrincipal, serverMisconfigured, unauthorized, maskSecret } from "./auth";
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
+import { executeCloudflareAI } from "@/adapters/cloudflare-ai";
+import type { ChatCompletionRequest } from "@/types/openai";
 import { selectActiveCredential } from "@/routing/keyPool";
 import { getAntigravityOAuthCredentials } from "./store";
 import type { EnvBindings } from "@/types/provider";
@@ -257,8 +259,141 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       "@cf/baai/bge-large-en-v1.5",
       "@cf/baai/bge-small-en-v1.5",
     ];
-  } else if (baseUrl && !baseUrl.includes("cloudcode-pa.googleapis.com")) {
-    // Consulta à API oficial upstream
+  } else if (id === "antigravity") {
+    try {
+      const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
+      const agy = await getValidAntigravityAccessToken(c.env);
+      if (agy?.accessToken) {
+        upstreamModels = [
+          "gemini-2.5-pro",
+          "gemini-2.5-flash",
+          "claude-3-7-sonnet",
+          "gemini-1.5-pro",
+          "gemini-1.5-flash",
+        ];
+      } else {
+        fetchError = "Antigravity: Login OAuth pendente. Conecte sua conta Google no painel OAuth.";
+      }
+    } catch (e: any) {
+      fetchError = "Antigravity: " + (e.message || "OAuth não autenticado");
+    }
+  } else if (id === "1min") {
+    const oneMinCatalog = [
+      "gpt-4o",
+      "gpt-4o-mini",
+      "claude-3-5-sonnet",
+      "claude-3-haiku",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "deepseek-chat",
+      "llama-3.3-70b-instruct",
+      "mistral-large-2",
+    ];
+    if (apiKey) {
+      upstreamModels = oneMinCatalog;
+    } else {
+      fetchError = "1min.ai: Chave de API necessária para ativar o catálogo de modelos.";
+    }
+  } else if (id === "gemini") {
+    if (apiKey) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = (await res.json()) as any;
+          if (Array.isArray(json.models)) {
+            upstreamModels = json.models
+              .filter((m: any) => {
+                const methods = m.supportedGenerationMethods || [];
+                return methods.includes("generateContent");
+              })
+              .map((m: any) => (m.name || "").replace(/^models\//, ""))
+              .filter(Boolean);
+          }
+        } else {
+          const errJson = (await res.json().catch(() => ({}))) as any;
+          fetchError = errJson.error?.message || `Google API HTTP ${res.status}`;
+        }
+      } catch (err: any) {
+        fetchError = err.name === "AbortError" ? "Timeout ao consultar Google Gemini (8s)" : (err.message || String(err));
+      }
+    } else {
+      fetchError = "Gemini: Cadastre sua chave de API (Google AI Studio) para descobrir modelos.";
+    }
+  } else if (id === "azure") {
+    const rawAzure = c.env.AZURE_OPENAI_ENDPOINT || baseUrl || "";
+    const cleanAzure = rawAzure.replace(/\/+$/, "");
+    if (cleanAzure && !cleanAzure.includes("https://openai.azure.com")) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        let url = `${cleanAzure}/openai/deployments?api-version=2024-02-15-preview`;
+        let res = await fetch(url, { headers: { Accept: "application/json", "api-key": apiKey }, signal: controller.signal });
+        if (!res.ok) {
+          url = `${cleanAzure}/openai/models?api-version=2024-02-15-preview`;
+          res = await fetch(url, { headers: { Accept: "application/json", "api-key": apiKey }, signal: controller.signal });
+        }
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = (await res.json()) as any;
+          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+          upstreamModels = list.map((m: any) => m.id || m.name || m.model).filter(Boolean);
+        } else {
+          fetchError = `Azure HTTP ${res.status}`;
+        }
+      } catch (err: any) {
+        fetchError = err.name === "AbortError" ? "Timeout ao consultar Azure (8s)" : (err.message || String(err));
+      }
+    } else {
+      fetchError = "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com)";
+    }
+  } else if (id === "bedrock") {
+    const bedrockModels = [
+      "anthropic.claude-3-7-sonnet-20250219-v1:0",
+      "anthropic.claude-3-5-sonnet-20241022-v2:0",
+      "anthropic.claude-3-5-haiku-20241022-v1:0",
+      "anthropic.claude-3-haiku-20240307-v1:0",
+      "meta.llama3-3-70b-instruct-v1:0",
+      "meta.llama3-1-70b-instruct-v1:0",
+      "meta.llama3-1-8b-instruct-v1:0",
+      "amazon.nova-pro-v1:0",
+      "amazon.nova-lite-v1:0",
+      "mistral.mistral-large-2407-v1:0",
+      "deepseek.r1-v1:0",
+    ];
+    if (apiKey) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const url = "https://bedrock.us-east-1.amazonaws.com/foundation-models";
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            Authorization: apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`,
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = (await res.json()) as any;
+          if (Array.isArray(json.modelSummaries)) {
+            upstreamModels = json.modelSummaries.map((m: any) => m.modelId).filter(Boolean);
+          }
+        } else {
+          upstreamModels = bedrockModels;
+        }
+      } catch {
+        upstreamModels = bedrockModels;
+      }
+    } else {
+      fetchError = "AWS Bedrock: Cadastre suas credenciais ou configure o proxy compatível";
+    }
+  } else if (baseUrl) {
+    // Consulta à API oficial upstream para outros provedores OpenAI / Anthropic
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -270,28 +405,15 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
 
       if (id === "pollinations") {
         url = "https://gen.pollinations.ai/models";
-      } else if (id === "gemini") {
-        if (apiKey) {
-          url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-        } else {
-          url = ""; // sem chave gemini, cai no catálogo
-        }
       } else if (id === "openrouter" || id === "openrouter-free") {
         url = "https://openrouter.ai/api/v1/models";
         if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-      } else if (id === "1min") {
-        url = "https://api.1min.ai/v1/models";
-        headers[headerName || "API-KEY"] = apiKey || "";
-      } else if (id === "azure") {
-        url = baseUrl.replace(/\/+$/, "") + "/models?api-version=2024-02-15-preview";
-        headers["api-key"] = apiKey || "";
       } else if (authType === "anthropic" || (prov && "protocol" in prov && prov.protocol === "anthropic")) {
         headers["x-api-key"] = apiKey || "";
         headers["anthropic-version"] = "2023-06-01";
       } else if (authType === "apikey-header") {
         headers[headerName || "api-key"] = apiKey || "";
       } else if (apiKey) {
-        // Assume OpenAI compatible se não foi tratado acima
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
         if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
           if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
@@ -303,7 +425,6 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         }
         headers["Authorization"] = `Bearer ${apiKey}`;
       } else {
-        // Se a chave estiver vazia, ainda podemos tentar bater no endpoint pra ver se é público
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
         if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
           if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
@@ -328,7 +449,6 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
             .map((m: string) => m.replace(/^models\//, ""));
 
           if (id === "openrouter-free") {
-            // Filtra modelos com sufixo :free ou custo zero
             const freeOnly = extracted.filter((m: string) => m.endsWith(":free"));
             extracted = freeOnly.length > 0 ? freeOnly : extracted;
           }
@@ -342,12 +462,11 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     }
   }
 
-  // 2. Combinar com catálogo conhecido do provedor e fallbacks ricos
+  // 2. Combinar com catálogo conhecido do provedor e modelos ativos
   const activeCustomModels = cfg.customModels[id] || [];
   const registryModels = prov?.models || [];
   const removedModels = cfg.removedModels?.[id] || [];
 
-  // Combina sem duplicatas
   const allAvailable = Array.from(
     new Set([
       ...upstreamModels,
@@ -363,9 +482,130 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     upstreamCount: upstreamModels.length,
     hasUpstream: upstreamModels.length > 0,
     fetchError,
-    activeModels: Array.from(new Set([...registryModels, ...activeCustomModels])).filter(m => !removedModels.includes(m)),
+    activeModels: Array.from(new Set([...registryModels, ...activeCustomModels])).filter((m) => !removedModels.includes(m)),
   });
 });
+
+/**
+ * Despachante unificado para teste direto de modelo/provedor sem side-effects
+ */
+export async function executeDirectProviderTest(
+  env: EnvBindings,
+  providerId: string,
+  apiKey: string,
+  model: string,
+  timeoutMs = 12000
+): Promise<{
+  provider: string;
+  model: string;
+  status: number;
+  latency_ms: number;
+  success: boolean;
+  output?: string;
+  error?: string;
+}> {
+  const testReq: ChatCompletionRequest = {
+    model,
+    messages: [{ role: "user" as const, content: "Respond with OK" }],
+    max_tokens: 5,
+    temperature: 0,
+    stream: false,
+  };
+
+  const start = Date.now();
+  try {
+    let resPromise: Promise<Response>;
+
+    if (providerId === "cloudflare-ai") {
+      if (!env.AI) {
+        return {
+          provider: providerId,
+          model,
+          status: 503,
+          latency_ms: 0,
+          success: false,
+          error: "Cloudflare Workers AI (env.AI) não está habilitado no ambiente",
+        };
+      }
+      resPromise = executeCloudflareAI(testReq, env.AI, model);
+    } else if (providerId === "antigravity") {
+      const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
+      const { executeAntigravityRequest } = await import("@/adapters/antigravity");
+      const antigravResult = await getValidAntigravityAccessToken(env);
+      if (!antigravResult?.accessToken) {
+        return {
+          provider: providerId,
+          model,
+          status: 401,
+          latency_ms: 0,
+          success: false,
+          error: "Antigravity: Nenhum token de acesso válido. Realize o login OAuth no painel.",
+        };
+      }
+      resPromise = executeAntigravityRequest(testReq, antigravResult.accessToken, antigravResult.projectId || "", model);
+    } else if (providerId === "1min") {
+      if (!apiKey) {
+        return {
+          provider: providerId,
+          model,
+          status: 401,
+          latency_ms: 0,
+          success: false,
+          error: "Sem chave de API para 1min.ai",
+        };
+      }
+      const { executeOneMinAI } = await import("@/adapters/onemin");
+      resPromise = executeOneMinAI(testReq, apiKey, model);
+    } else {
+      if (!apiKey && providerId !== "pollinations" && providerId !== "freeapikey") {
+        return {
+          provider: providerId,
+          model,
+          status: 401,
+          latency_ms: 0,
+          success: false,
+          error: "Sem chave de API configurada",
+        };
+      }
+      resPromise = executeOpenAICompatible(testReq, providerId, apiKey, model);
+    }
+
+    const res = (await Promise.race([
+      resPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout " + timeoutMs + "ms")), timeoutMs)
+      ),
+    ])) as Response;
+
+    const latency = Date.now() - start;
+    if (res.ok) {
+      let text = "OK";
+      try {
+        const j = (await res.json()) as any;
+        if (j.choices?.[0]?.message?.content) {
+          text = j.choices[0].message.content.trim().slice(0, 40);
+        } else if (j.candidates?.[0]?.content?.parts?.[0]?.text) {
+          text = j.candidates[0].content.parts[0].text.trim().slice(0, 40);
+        } else if (j.response || j.output) {
+          text = String(j.response || j.output).trim().slice(0, 40);
+        }
+      } catch {}
+      return { provider: providerId, model, status: res.status, latency_ms: latency, success: true, output: text };
+    }
+
+    const errText = (await res.text().catch(() => "")).slice(0, 180);
+    return { provider: providerId, model, status: res.status, latency_ms: latency, success: false, error: errText };
+  } catch (err: unknown) {
+    return {
+      provider: providerId,
+      model,
+      status: 500,
+      latency_ms: Date.now() - start,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 adminRouter.post("/providers/:id/test-models", async (c) => {
   const id = c.req.param("id");
@@ -378,73 +618,24 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
   const allAvailable = Array.from(new Set([...registryModels, ...activeCustomModels]))
     .filter((m) => !removedModels.includes(m));
 
-  // Limitar testes para não sobrecarregar
-  const testModels = allAvailable.slice(0, 3);
+  // Limitar testes para os modelos ativos (máximo 5)
+  const testModels = allAvailable.slice(0, 5);
   
   if (testModels.length === 0) {
-    return c.json({ ok: false, results: [] });
+    return c.json({ ok: false, results: [], message: "Nenhum modelo cadastrado para testar" });
   }
 
   const credential = await selectActiveCredential(c.env, id);
   const apiKey = credential.apiKey;
-  if (!apiKey && id !== "cloudflare-ai") {
-    return c.json({ error: { message: "Sem chave de API para testar", type: "auth" } }, 401);
+  if (!apiKey && id !== "cloudflare-ai" && id !== "antigravity" && id !== "pollinations" && id !== "freeapikey") {
+    return c.json({ error: { message: "Sem chave de API configurada para testar este provedor", type: "auth" } }, 401);
   }
 
   const COMBO_TEST_TIMEOUT_MS = 12000;
-  
-  const testTarget = async (model: string) => {
-    const testReq = {
-      model,
-      messages: [{ role: "user" as const, content: "Respond with OK" }],
-      max_tokens: 5,
-      temperature: 0,
-      stream: false,
-    };
-    const start = Date.now();
-    try {
-      let res: Response;
-      
-      if (id === "antigravity") {
-        const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
-        const { executeAntigravityRequest } = await import("@/adapters/antigravity");
-        
-        const antigravResult = await getValidAntigravityAccessToken(c.env);
-        if (!antigravResult?.accessToken) throw new Error("Antigravity: no valid access token");
-        
-        // Simular um pedido para o Antigravity
-        res = await Promise.race([
-          executeAntigravityRequest(testReq as any, antigravResult.accessToken, antigravResult.projectId || "", model),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
-        ]) as Response;
-      } else {
-        res = await Promise.race([
-          executeOpenAICompatible(testReq, id, apiKey, model),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS))
-        ]) as Response;
-      }
+  const results = await Promise.all(
+    testModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, COMBO_TEST_TIMEOUT_MS))
+  );
 
-      const latency = Date.now() - start;
-      if (res.ok) {
-        let text = "OK";
-        try {
-          const j = (await res.json()) as any;
-          if (id === "antigravity" || model.includes("gemini")) {
-            text = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 30) || "OK";
-          } else {
-            text = j.choices?.[0]?.message?.content?.trim().slice(0, 30) || "OK";
-          }
-        } catch { /* stream/ignore */ }
-        return { provider: id, model, status: res.status, latency_ms: latency, success: true, output: text };
-      }
-      const errText = (await res.text()).slice(0, 150);
-      return { provider: id, model, status: res.status, latency_ms: latency, success: false, error: errText };
-    } catch (err: unknown) {
-      return { provider: id, model, status: 500, latency_ms: Date.now() - start, success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  };
-
-  const results = await Promise.all(testModels.map(testTarget));
   return c.json({ ok: true, results });
 });
 
@@ -744,49 +935,15 @@ adminRouter.post("/combos/test", async (c) => {
     ];
   }
 
-  // A-7: call provider directly, NOT through cascade (no fallback side effects)
+  // A-7: call provider directly with proper adapter and timeout
   const testTarget = async (target: { provider: string; model: string }) => {
     const provCfg = getProviderConfig(target.provider);
     if (!provCfg) {
-      return { provider: target.provider, model: target.model, status: 404, latency_ms: 0, success: false, error: "Provedor nao encontrado" };
+      return { provider: target.provider, model: target.model, status: 404, latency_ms: 0, success: false, error: "Provedor não encontrado" };
     }
     const credential = await selectActiveCredential(c.env, target.provider);
     const apiKey = credential.apiKey;
-    if (!apiKey && target.provider !== "cloudflare-ai") {
-      return { provider: target.provider, model: target.model, status: 401, latency_ms: 0, success: false, error: "Sem chave de API" };
-    }
-
-    const testReq = {
-      model: target.model,
-      messages: [{ role: "user" as const, content: "Respond with OK" }],
-      max_tokens: 5,
-      temperature: 0,
-      stream: false,
-    };
-
-    const start = Date.now();
-    try {
-      // M-10: per-target timeout
-      const res = await Promise.race([
-        executeOpenAICompatible(testReq, target.provider, apiKey, target.model),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout " + COMBO_TEST_TIMEOUT_MS + "ms")), COMBO_TEST_TIMEOUT_MS)
-        ),
-      ]);
-      const latency = Date.now() - start;
-      if (res.ok) {
-        let text = "OK";
-        try {
-          const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-          text = j.choices?.[0]?.message?.content?.trim().slice(0, 30) || "OK";
-        } catch { /* stream */ }
-        return { provider: target.provider, model: target.model, status: res.status, latency_ms: latency, success: true, output: text };
-      }
-      const errText = (await res.text()).slice(0, 150);
-      return { provider: target.provider, model: target.model, status: res.status, latency_ms: latency, success: false, error: errText };
-    } catch (err: unknown) {
-      return { provider: target.provider, model: target.model, status: 500, latency_ms: Date.now() - start, success: false, error: err instanceof Error ? err.message : String(err) };
-    }
+    return executeDirectProviderTest(c.env, target.provider, apiKey, target.model, COMBO_TEST_TIMEOUT_MS);
   };
 
   // M-10: all in parallel

@@ -7,13 +7,25 @@ const keyCooldowns: Map<string, number> = new Map();
 const KV_COOLDOWN_PREFIX = "cooldown:";
 
 function environmentCredentials(env: EnvBindings, providerId: string): ProviderCredential[] {
+  const e = env as any;
   const envKeyMap: Record<string, string | undefined> = {
-    openai: env.OPENAI_API_KEYS, azure: env.AZURE_OPENAI_API_KEYS, bedrock: env.BEDROCK_API_KEYS,
-    alibaba: env.ALIBABA_API_KEYS, "1min": env.ONE_MIN_API_KEYS, freeapikey: env.FREEAPIKEY_KEYS,
-    gemini: env.GEMINI_API_KEYS, groq: env.GROQ_API_KEYS, cerebras: env.CEREBRAS_API_KEYS,
-    sambanova: env.SAMBANOVA_API_KEYS, mistral: env.MISTRAL_API_KEYS, openrouter: env.OPENROUTER_API_KEYS,
-    deepseek: env.DEEPSEEK_API_KEYS, pollinations: env.POLLINATIONS_API_KEYS, tavily: env.TAVILY_API_KEYS,
-    serper: env.SERPER_API_KEYS, firecrawl: env.FIRECRAWL_API_KEYS,
+    openai: env.OPENAI_API_KEYS || e.OPENAI_API_KEY,
+    azure: env.AZURE_OPENAI_API_KEYS || e.AZURE_OPENAI_API_KEY,
+    bedrock: env.BEDROCK_API_KEYS || e.BEDROCK_API_KEY || e.AWS_BEARER_TOKEN,
+    alibaba: env.ALIBABA_API_KEYS || e.ALIBABA_API_KEY || e.DASHSCOPE_API_KEY,
+    "1min": env.ONE_MIN_API_KEYS || e.ONE_MIN_API_KEY || e["1MIN_API_KEY"],
+    freeapikey: env.FREEAPIKEY_KEYS || e.FREEAPIKEY_KEY,
+    gemini: env.GEMINI_API_KEYS || e.GEMINI_API_KEY,
+    groq: env.GROQ_API_KEYS || e.GROQ_API_KEY,
+    cerebras: env.CEREBRAS_API_KEYS || e.CEREBRAS_API_KEY,
+    sambanova: env.SAMBANOVA_API_KEYS || e.SAMBANOVA_API_KEY,
+    mistral: env.MISTRAL_API_KEYS || e.MISTRAL_API_KEY,
+    openrouter: env.OPENROUTER_API_KEYS || e.OPENROUTER_API_KEY,
+    deepseek: env.DEEPSEEK_API_KEYS || e.DEEPSEEK_API_KEY,
+    pollinations: env.POLLINATIONS_API_KEYS || e.POLLINATIONS_API_KEY,
+    tavily: env.TAVILY_API_KEYS || e.TAVILY_API_KEY,
+    serper: env.SERPER_API_KEYS || e.SERPER_API_KEY,
+    firecrawl: env.FIRECRAWL_API_KEYS || env.FIRECRAWL_API_KEY,
   };
   return (envKeyMap[providerId] || "").split(",").map((apiKey) => apiKey.trim()).filter(Boolean).map((apiKey) => ({ apiKey }));
 }
