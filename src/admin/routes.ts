@@ -651,7 +651,9 @@ export async function executeDirectProviderTest(
   providerId: string,
   apiKey: string,
   model: string,
-  timeoutMs = 12000,
+  // Modelos "thinking" do Code Assist (3.8 tiered, Opus) levam >12s no
+  // primeiro token; um timeout curto marcava como falha um modelo que responde.
+  timeoutMs = 30000,
   overrideBaseUrl?: string
 ): Promise<{
   provider: string;
