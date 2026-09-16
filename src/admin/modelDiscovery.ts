@@ -135,8 +135,8 @@ export async function fetchAntigravityAvailableModels(
       }
 
       const payload = antigravityPayload(json);
-      const list = payload?.models ?? payload?.availableModels ?? payload?.available_models;
-      const raw = extractModelIds(list);
+      // extractModelIds já entende { models: { slug: {...} } } e { data: [...] }.
+      const raw = extractModelIds(payload);
 
       if (raw.length > 0) {
         return {
