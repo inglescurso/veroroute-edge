@@ -89,6 +89,15 @@ export function formatOpenAIToGemini(request: ChatCompletionRequest): Record<str
     };
   }
 
+  // Cloud Code Assist valida estes metadados internos para alguns modelos
+  // Gemini/Claude expostos pelo catálogo (o IDE oficial sempre os envia).
+  payload.labels = {
+    model_enum: "MODEL_PLACEHOLDER_M36",
+    used_claude: "false",
+    used_claude_conservative: "false",
+    used_non_gemini_model: "false",
+  };
+
   // Conversão de tools do OpenAI para functionDeclarations do Gemini
   if (request.tools && request.tools.length > 0) {
     const functionDeclarations = request.tools.map((t) => ({
