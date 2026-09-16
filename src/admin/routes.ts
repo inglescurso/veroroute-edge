@@ -11,6 +11,7 @@ import {
   setStoredProviderCredentials,
   removeProviderKeys,
   getCustomProviderKeys,
+  setProviderBaseUrl,
   type CustomProvider,
   type ComboConfig,
 } from "./store";
@@ -56,12 +57,16 @@ adminRouter.get("/config", async (c) => {
     const mergedModels = [...baseModels, ...customModels.filter((m) => !baseModels.includes(m))];
     const finalModels = mergedModels.filter((m) => cfg.modelStates[id + "/" + m]?.enabled !== false);
     const keys = await getCustomProviderKeys(c.env, id);
+    const customBaseUrl = cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined);
+    const effectiveBaseUrl = customBaseUrl || staticCfg.baseUrl || "";
     providers.push({
       id,
       name: staticCfg.name,
       isBuiltIn: true,
       enabled: state,
-      baseUrl: staticCfg.baseUrl || "",
+      baseUrl: effectiveBaseUrl,
+      defaultBaseUrl: staticCfg.baseUrl || "",
+      hasCustomEndpoint: Boolean(customBaseUrl),
       authType: staticCfg.authType,
       protocol: "openai",
       models: finalModels,
@@ -78,12 +83,15 @@ adminRouter.get("/config", async (c) => {
     const keys = await getCustomProviderKeys(c.env, id);
     const removed = new Set(cfg.removedModels?.[id] || []);
     const finalModels = (cp.models || []).filter((m) => !removed.has(m) && cfg.modelStates[id + "/" + m]?.enabled !== false);
+    const customBaseUrl = cfg.providerBaseUrls?.[id];
     providers.push({
       id,
       name: cp.name,
       isBuiltIn: false,
       enabled: true,
-      baseUrl: cp.baseUrl,
+      baseUrl: customBaseUrl || cp.baseUrl,
+      defaultBaseUrl: cp.baseUrl,
+      hasCustomEndpoint: Boolean(customBaseUrl),
       authType: cp.protocol === "anthropic" ? "anthropic" : "bearer",
       protocol: cp.protocol,
       models: finalModels,
@@ -121,6 +129,33 @@ adminRouter.post("/providers/:id/toggle", async (c) => {
     cfg.providerStates[id] = { enabled: enabled ?? !current };
   });
   return c.json({ ok: true, id, providerStates: cfg.providerStates });
+});
+
+adminRouter.post("/providers/:id/endpoint", async (c) => {
+  const id = c.req.param("id");
+  const body = (await c.req.json().catch(() => ({}))) as { baseUrl?: string };
+  const rawUrl = (body.baseUrl || "").trim();
+  const cfg = await setProviderBaseUrl(c.env, id, rawUrl);
+  const staticCfg = PROVIDER_REGISTRY[id];
+  const effectiveBaseUrl = cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined) || staticCfg?.baseUrl || "";
+  return c.json({
+    ok: true,
+    id,
+    baseUrl: effectiveBaseUrl,
+    hasCustomEndpoint: Boolean(cfg.providerBaseUrls?.[id]),
+  });
+});
+
+adminRouter.delete("/providers/:id/endpoint", async (c) => {
+  const id = c.req.param("id");
+  const cfg = await setProviderBaseUrl(c.env, id, undefined);
+  const staticCfg = PROVIDER_REGISTRY[id];
+  return c.json({
+    ok: true,
+    id,
+    baseUrl: staticCfg?.baseUrl || "",
+    hasCustomEndpoint: false,
+  });
 });
 
 adminRouter.post("/providers", async (c) => {
@@ -226,7 +261,7 @@ adminRouter.post("/providers/:id/models", async (c) => {
 
 adminRouter.post("/providers/:id/fetch-models", async (c) => {
   const id = c.req.param("id");
-  const body = (await c.req.json().catch(() => ({}))) as { apiKey?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { apiKey?: string; baseUrl?: string };
   const cfg = await getAdminConfig(c.env);
   const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id];
   const preset = FREE_PROVIDER_PRESETS.find((p) => p.id === id);
@@ -236,7 +271,9 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     apiKey = (await selectActiveCredential(c.env, id)).apiKey;
   }
 
-  const baseUrl = prov?.baseUrl || preset?.baseUrl || "";
+  // Prioriza baseUrl enviado no body, depois customizado no KV, depois env var, depois default do provedor
+  const customBaseUrl = body.baseUrl?.trim() || cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined);
+  const baseUrl = customBaseUrl || prov?.baseUrl || preset?.baseUrl || "";
   const authType = (prov && "authType" in prov ? prov.authType : undefined) || "bearer";
   const headerName: string = (prov && "headerName" in prov && typeof (prov as any).headerName === "string" ? (prov as any).headerName : "api-key");
 
@@ -260,73 +297,141 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       "@cf/baai/bge-small-en-v1.5",
     ];
   } else if (id === "antigravity") {
+    const antigravityCatalog = [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "claude-3-7-sonnet",
+      "claude-3-5-sonnet",
+      "gemini-1.5-pro",
+      "gemini-1.5-flash",
+      "code-bison",
+      "chat-bison",
+    ];
     try {
       const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
-      const agy = await getValidAntigravityAccessToken(c.env);
+      const agy = await getValidAntigravityAccessToken(c.env).catch(() => null);
       if (agy?.accessToken) {
-        upstreamModels = [
-          "gemini-2.5-pro",
-          "gemini-2.5-flash",
-          "claude-3-7-sonnet",
-          "gemini-1.5-pro",
-          "gemini-1.5-flash",
-        ];
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const modelsRes = await fetch("https://cloudcode-pa.googleapis.com/v1internal:models", {
+            headers: {
+              Authorization: `Bearer ${agy.accessToken}`,
+              "User-Agent": "Antigravity-CLI/2.5.0",
+              "X-Goog-Api-Client": "gl-node/20.20.2 antigravity/2.5.0",
+              Accept: "application/json",
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (modelsRes.ok) {
+            const data = (await modelsRes.json().catch(() => ({}))) as any;
+            const list = Array.isArray(data.models) ? data.models : (Array.isArray(data.availableModels) ? data.availableModels : []);
+            const extracted = list.map((m: any) => typeof m === "string" ? m : (m.id || m.name || m.modelId)).filter(Boolean);
+            upstreamModels = extracted.length > 0 ? extracted : antigravityCatalog;
+          } else {
+            upstreamModels = antigravityCatalog;
+          }
+        } catch {
+          upstreamModels = antigravityCatalog;
+        }
       } else {
-        fetchError = "Antigravity: Login OAuth pendente. Conecte sua conta Google no painel OAuth.";
+        upstreamModels = antigravityCatalog;
+        fetchError = "Antigravity: Login OAuth pendente. Para conectar sua conta Google, use a aba Antigravity OAuth.";
       }
     } catch (e: any) {
+      upstreamModels = antigravityCatalog;
       fetchError = "Antigravity: " + (e.message || "OAuth não autenticado");
     }
   } else if (id === "1min") {
     const oneMinCatalog = [
       "gpt-4o",
       "gpt-4o-mini",
+      "o1",
+      "o1-mini",
+      "o3-mini",
+      "claude-3-7-sonnet",
       "claude-3-5-sonnet",
-      "claude-3-haiku",
+      "claude-3-5-haiku",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
       "gemini-2.0-flash",
-      "gemini-1.5-flash",
       "gemini-1.5-pro",
+      "gemini-1.5-flash",
       "deepseek-chat",
+      "deepseek-reasoner",
       "llama-3.3-70b-instruct",
       "mistral-large-2",
+      "qwen-2.5-72b-instruct",
     ];
-    if (apiKey) {
-      upstreamModels = oneMinCatalog;
-    } else {
-      fetchError = "1min.ai: Chave de API necessária para ativar o catálogo de modelos.";
+    upstreamModels = oneMinCatalog;
+    if (!apiKey) {
+      fetchError = "Catálogo oficial 1min.ai disponível. Cadastre uma chave de API para habilitar os testes.";
     }
   } else if (id === "gemini") {
+    const geminiOfficialCatalog = [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-thinking-preview",
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-pro",
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-8b",
+      "text-embedding-004",
+      "aqa",
+    ];
     if (apiKey) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-        const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+        let url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        let res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+        if (!res.ok) {
+          url = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
+          res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+        }
         clearTimeout(timeoutId);
         if (res.ok) {
           const json = (await res.json()) as any;
           if (Array.isArray(json.models)) {
-            upstreamModels = json.models
+            const fetched = json.models
               .filter((m: any) => {
                 const methods = m.supportedGenerationMethods || [];
-                return methods.includes("generateContent");
+                return methods.length === 0 || methods.includes("generateContent") || methods.includes("generateAnswer");
               })
               .map((m: any) => (m.name || "").replace(/^models\//, ""))
               .filter(Boolean);
+            upstreamModels = fetched.length > 0 ? fetched : geminiOfficialCatalog;
+          } else {
+            upstreamModels = geminiOfficialCatalog;
           }
         } else {
           const errJson = (await res.json().catch(() => ({}))) as any;
           fetchError = errJson.error?.message || `Google API HTTP ${res.status}`;
+          upstreamModels = geminiOfficialCatalog;
         }
       } catch (err: any) {
         fetchError = err.name === "AbortError" ? "Timeout ao consultar Google Gemini (8s)" : (err.message || String(err));
+        upstreamModels = geminiOfficialCatalog;
       }
     } else {
-      fetchError = "Gemini: Cadastre sua chave de API (Google AI Studio) para descobrir modelos.";
+      upstreamModels = geminiOfficialCatalog;
+      fetchError = "Catálogo oficial Gemini disponível. Digite sua chave de API para sincronizar modelos personalizados.";
     }
   } else if (id === "azure") {
-    const rawAzure = c.env.AZURE_OPENAI_ENDPOINT || baseUrl || "";
-    const cleanAzure = rawAzure.replace(/\/+$/, "");
+    const cleanAzure = (baseUrl || "").replace(/\/+$/, "");
+    const azureCatalogPresets = [
+      "gpt-4o",
+      "gpt-4o-mini",
+      "o1",
+      "o3-mini",
+      "gpt-4-turbo",
+      "gpt-35-turbo",
+      "text-embedding-3-small",
+      "text-embedding-3-large",
+    ];
     if (cleanAzure && !cleanAzure.includes("https://openai.azure.com")) {
       try {
         const controller = new AbortController();
@@ -341,15 +446,19 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         if (res.ok) {
           const json = (await res.json()) as any;
           const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-          upstreamModels = list.map((m: any) => m.id || m.name || m.model).filter(Boolean);
+          const extracted = list.map((m: any) => m.id || m.name || m.model).filter(Boolean);
+          upstreamModels = extracted.length > 0 ? extracted : azureCatalogPresets;
         } else {
-          fetchError = `Azure HTTP ${res.status}`;
+          fetchError = `Azure HTTP ${res.status}: verifique a chave e o endpoint`;
+          upstreamModels = azureCatalogPresets;
         }
       } catch (err: any) {
         fetchError = err.name === "AbortError" ? "Timeout ao consultar Azure (8s)" : (err.message || String(err));
+        upstreamModels = azureCatalogPresets;
       }
     } else {
-      fetchError = "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com)";
+      upstreamModels = azureCatalogPresets;
+      fetchError = "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com) no campo Endpoint acima.";
     }
   } else if (id === "bedrock") {
     const bedrockModels = [
@@ -362,27 +471,29 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       "meta.llama3-1-8b-instruct-v1:0",
       "amazon.nova-pro-v1:0",
       "amazon.nova-lite-v1:0",
+      "amazon.nova-micro-v1:0",
       "mistral.mistral-large-2407-v1:0",
       "deepseek.r1-v1:0",
     ];
-    if (apiKey) {
+    const cleanBedrock = (baseUrl || "").replace(/\/+$/, "");
+    if (cleanBedrock && !cleanBedrock.includes("amazonaws.com")) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const url = "https://bedrock.us-east-1.amazonaws.com/foundation-models";
+        const url = cleanBedrock.endsWith("/models") ? cleanBedrock : (cleanBedrock.endsWith("/v1") ? `${cleanBedrock}/models` : `${cleanBedrock}/v1/models`);
         const res = await fetch(url, {
           headers: {
             Accept: "application/json",
-            Authorization: apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`,
+            Authorization: apiKey ? (apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`) : "",
           },
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
         if (res.ok) {
           const json = (await res.json()) as any;
-          if (Array.isArray(json.modelSummaries)) {
-            upstreamModels = json.modelSummaries.map((m: any) => m.modelId).filter(Boolean);
-          }
+          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.models) ? json.models : (Array.isArray(json) ? json : []));
+          const extracted = list.map((m: any) => typeof m === "string" ? m : (m.id || m.name || m.model)).filter(Boolean);
+          upstreamModels = extracted.length > 0 ? extracted : bedrockModels;
         } else {
           upstreamModels = bedrockModels;
         }
@@ -390,7 +501,10 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         upstreamModels = bedrockModels;
       }
     } else {
-      fetchError = "AWS Bedrock: Cadastre suas credenciais ou configure o proxy compatível";
+      upstreamModels = bedrockModels;
+      if (!apiKey) {
+        fetchError = "AWS Bedrock: Catálogo de Foundation Models disponível. Configure endpoint de proxy ou credenciais para testes.";
+      }
     }
   } else if (baseUrl) {
     // Consulta à API oficial upstream para outros provedores OpenAI / Anthropic
@@ -413,49 +527,37 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         headers["anthropic-version"] = "2023-06-01";
       } else if (authType === "apikey-header") {
         headers[headerName || "api-key"] = apiKey || "";
-      } else if (apiKey) {
-        let cleanedUrl = baseUrl.replace(/\/+$/, "");
-        if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
-          if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
-          url = cleanedUrl + "/models";
-        } else if (!cleanedUrl.endsWith("/models")) {
-          url = cleanedUrl + "/models";
-        } else {
-          url = cleanedUrl;
-        }
-        headers["Authorization"] = `Bearer ${apiKey}`;
       } else {
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
-        if (!cleanedUrl.endsWith("/models") && (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1"))) {
+        if (cleanedUrl.endsWith("/models")) {
+          url = cleanedUrl;
+        } else if (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1")) {
           if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
           url = cleanedUrl + "/models";
-        } else if (!cleanedUrl.endsWith("/models")) {
-          url = cleanedUrl + "/models";
         } else {
-          url = cleanedUrl;
+          url = cleanedUrl + "/models";
         }
+        if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
       }
 
-      if (url) {
-        const res = await fetch(url, { headers, signal: controller.signal });
-        clearTimeout(timeoutId);
+      const res = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timeoutId);
 
-        if (res.ok) {
-          const json = (await res.json()) as any;
-          const list = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : (Array.isArray(json.models) ? json.models : []));
-          let extracted = list
-            .map((m: any) => (typeof m === "string" ? m : (m.id || m.name)))
-            .filter((m: any): m is string => Boolean(m))
-            .map((m: string) => m.replace(/^models\//, ""));
+      if (res.ok) {
+        const json = (await res.json()) as any;
+        const list = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : (Array.isArray(json.models) ? json.models : []));
+        let extracted = list
+          .map((m: any) => (typeof m === "string" ? m : (m.id || m.name)))
+          .filter((m: any): m is string => Boolean(m))
+          .map((m: string) => m.replace(/^models\//, ""));
 
-          if (id === "openrouter-free") {
-            const freeOnly = extracted.filter((m: string) => m.endsWith(":free"));
-            extracted = freeOnly.length > 0 ? freeOnly : extracted;
-          }
-          upstreamModels = extracted;
-        } else {
-          fetchError = `Upstream HTTP ${res.status}`;
+        if (id === "openrouter-free") {
+          const freeOnly = extracted.filter((m: string) => m.endsWith(":free"));
+          extracted = freeOnly.length > 0 ? freeOnly : extracted;
         }
+        upstreamModels = extracted;
+      } else {
+        fetchError = `Upstream HTTP ${res.status}`;
       }
     } catch (err: any) {
       fetchError = err.name === "AbortError" ? "Timeout ao consultar upstream (8s)" : (err.message || String(err));
@@ -494,7 +596,8 @@ export async function executeDirectProviderTest(
   providerId: string,
   apiKey: string,
   model: string,
-  timeoutMs = 12000
+  timeoutMs = 12000,
+  overrideBaseUrl?: string
 ): Promise<{
   provider: string;
   model: string;
@@ -555,7 +658,7 @@ export async function executeDirectProviderTest(
         };
       }
       const { executeOneMinAI } = await import("@/adapters/onemin");
-      resPromise = executeOneMinAI(testReq, apiKey, model);
+      resPromise = executeOneMinAI(testReq, apiKey, model, overrideBaseUrl);
     } else {
       if (!apiKey && providerId !== "pollinations" && providerId !== "freeapikey") {
         return {
@@ -567,7 +670,7 @@ export async function executeDirectProviderTest(
           error: "Sem chave de API configurada",
         };
       }
-      resPromise = executeOpenAICompatible(testReq, providerId, apiKey, model);
+      resPromise = executeOpenAICompatible(testReq, providerId, apiKey, model, overrideBaseUrl);
     }
 
     const res = (await Promise.race([
@@ -609,6 +712,11 @@ export async function executeDirectProviderTest(
 
 adminRouter.post("/providers/:id/test-models", async (c) => {
   const id = c.req.param("id");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    apiKey?: string;
+    baseUrl?: string;
+    models?: string[];
+  };
   const cfg = await getAdminConfig(c.env);
   const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id];
   const activeCustomModels = cfg.customModels[id] || [];
@@ -618,22 +726,28 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
   const allAvailable = Array.from(new Set([...registryModels, ...activeCustomModels]))
     .filter((m) => !removedModels.includes(m));
 
-  // Limitar testes para os modelos ativos (máximo 5)
-  const testModels = allAvailable.slice(0, 5);
-  
-  if (testModels.length === 0) {
+  // Prioriza modelos passados no body ou os primeiros ativos (máximo 5)
+  const targetModels = (Array.isArray(body.models) && body.models.length > 0)
+    ? body.models.slice(0, 5)
+    : allAvailable.slice(0, 5);
+
+  if (targetModels.length === 0) {
     return c.json({ ok: false, results: [], message: "Nenhum modelo cadastrado para testar" });
   }
 
-  const credential = await selectActiveCredential(c.env, id);
-  const apiKey = credential.apiKey;
+  let apiKey = body.apiKey?.trim() || "";
+  if (!apiKey) {
+    apiKey = (await selectActiveCredential(c.env, id)).apiKey;
+  }
   if (!apiKey && id !== "cloudflare-ai" && id !== "antigravity" && id !== "pollinations" && id !== "freeapikey") {
     return c.json({ error: { message: "Sem chave de API configurada para testar este provedor", type: "auth" } }, 401);
   }
 
+  const effectiveBaseUrl = body.baseUrl?.trim() || cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined) || prov?.baseUrl;
+
   const COMBO_TEST_TIMEOUT_MS = 12000;
   const results = await Promise.all(
-    testModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, COMBO_TEST_TIMEOUT_MS))
+    targetModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, COMBO_TEST_TIMEOUT_MS, effectiveBaseUrl))
   );
 
   return c.json({ ok: true, results });
@@ -943,7 +1057,8 @@ adminRouter.post("/combos/test", async (c) => {
     }
     const credential = await selectActiveCredential(c.env, target.provider);
     const apiKey = credential.apiKey;
-    return executeDirectProviderTest(c.env, target.provider, apiKey, target.model, COMBO_TEST_TIMEOUT_MS);
+    const customBaseUrl = cfg.providerBaseUrls?.[target.provider] || (target.provider === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined);
+    return executeDirectProviderTest(c.env, target.provider, apiKey, target.model, COMBO_TEST_TIMEOUT_MS, customBaseUrl);
   };
 
   // M-10: all in parallel

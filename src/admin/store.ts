@@ -88,6 +88,7 @@ export interface AdminConfig {
   virtualKeys: Record<string, VirtualApiKey>;
   combos: Record<string, ComboConfig>;
   antigravityConfig?: AntigravityOAuthConfig;
+  providerBaseUrls?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +154,7 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   },
   virtualKeys: {},
   combos: {},
+  providerBaseUrls: {},
 };
 
 const KV_ADMIN_KEY = "admin:config";
@@ -212,6 +214,7 @@ export async function getAdminConfig(env: EnvBindings): Promise<AdminConfig> {
         removedModels: { ...(p.removedModels ?? {}) },
         combos: mergeComos(p),
         antigravityConfig: p.antigravityConfig,
+        providerBaseUrls: { ...(p.providerBaseUrls ?? {}) },
       };
       cache = { data: merged, ts: now };
       return cloneConfig(merged);
@@ -393,3 +396,23 @@ export async function removeProviderKeys(env: EnvBindings, providerId: string, k
   await setStoredProviderCredentials(env, providerId, remaining);
   return remaining.map((item) => item.apiKey);
 }
+
+export async function setProviderBaseUrl(
+  env: EnvBindings,
+  providerId: string,
+  baseUrl?: string
+): Promise<AdminConfig> {
+  return mutateAdminConfig(env, (cfg) => {
+    if (!cfg.providerBaseUrls) cfg.providerBaseUrls = {};
+    const trimmed = (baseUrl || "").trim();
+    if (trimmed) {
+      cfg.providerBaseUrls[providerId] = trimmed;
+    } else {
+      delete cfg.providerBaseUrls[providerId];
+    }
+    if (cfg.customProviders[providerId] && trimmed) {
+      cfg.customProviders[providerId].baseUrl = trimmed;
+    }
+  });
+}
+

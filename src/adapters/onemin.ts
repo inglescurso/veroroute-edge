@@ -9,14 +9,18 @@ const ONEMIN_BASE = "https://api.1min.ai/api/features";
 export async function executeOneMinAI(
   request: ChatCompletionRequest,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  overrideBaseUrl?: string
 ): Promise<Response> {
   if (!apiKey) throw new Error("1min.ai: API key not configured");
 
   const cleanModel = modelName.replace("1min/", "");
   const isStream = request.stream ?? false;
 
-  const endpoint = `https://api.1min.ai/api/chat-with-ai${isStream ? "?isStreaming=true" : ""}`;
+  const base = (overrideBaseUrl || "https://api.1min.ai/api/chat-with-ai").replace(/\/+$/, "");
+  const endpoint = base.includes("chat-with-ai")
+    ? `${base}${isStream ? "?isStreaming=true" : ""}`
+    : `${base}/chat-with-ai${isStream ? "?isStreaming=true" : ""}`;
 
   let prompt = "";
   const images: string[] = [];

@@ -1334,6 +1334,19 @@ dsh --model combo-super-payload
         </div>
       </div>
 
+      <!-- Configuração de Endpoint & Chave de API para Busca / Teste -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; flex-wrap:wrap; gap:0.4rem;">
+          <label style="font-size:0.8rem; font-weight:600; color:#fff; margin:0;">🌐 Endpoint / Base URL do Provedor:</label>
+          <button type="button" class="btn btn-secondary" style="padding:0.2rem 0.55rem; font-size:0.72rem;" onclick="saveEndpointFromModelsModal()">💾 Salvar Endpoint</button>
+        </div>
+        <input type="text" id="mpm-endpoint-input" placeholder="https://..." style="width:100%; font-size:0.8rem; font-family:monospace; margin-bottom:0.4rem;" />
+        <div id="mpm-endpoint-hint" style="font-size:0.72rem; color:var(--text-muted); margin-bottom:0.6rem; line-height:1.4;"></div>
+
+        <label style="display:block; font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:0.35rem;">🔑 Chave de API / Token (opcional para busca/teste imediato):</label>
+        <input type="text" id="mpm-key-input" placeholder="Deixe em branco para usar as chaves salvas no pool" style="width:100%; font-size:0.8rem; font-family:monospace;" />
+      </div>
+
       <!-- Descoberta Upstream & Catálogo -->
       <div style="background: rgba(56, 189, 248, 0.03); border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -1387,6 +1400,32 @@ dsh --model combo-super-payload
 
       <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--card-border); padding-top: 0.75rem;">
         <button type="button" class="btn btn-secondary" onclick="closeProviderModelsModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR ENDPOINT DO PROVEDOR -->
+  <div id="modal-provider-endpoint" class="modal-overlay">
+    <div class="modal-card" style="max-width: 540px; width: 95%;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h3 id="mpe-title" style="margin: 0; font-size: 1.15rem; color: #fff;">🌐 Configurar Endpoint</h3>
+        <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.85rem;" onclick="closeProviderEndpointModal()">✕</button>
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #fff; margin-bottom: 0.4rem;">
+          URL Base do Endpoint:
+        </label>
+        <input type="text" id="mpe-baseurl" placeholder="https://..." style="width: 100%; font-size: 0.85rem; font-family: monospace;" />
+        <div id="mpe-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.45;"></div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--card-border); padding-top: 0.85rem; margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <button type="button" class="btn btn-secondary" style="font-size: 0.78rem;" onclick="resetProviderEndpoint()">🔄 Restaurar Padrão</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeProviderEndpointModal()">Cancelar</button>
+          <button type="button" class="btn" onclick="saveProviderEndpoint()">💾 Salvar Endpoint</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1959,21 +1998,31 @@ git push origin master
         box.className = 'provider-box';
         const keyCount = p.keyCount !== undefined ? p.keyCount : (p.keys ? p.keys.length : 0);
         const modelCount = p.models ? p.models.length : 0;
+        const customBadge = p.hasCustomEndpoint ? '<span style="font-size:0.65rem; padding:0.1rem 0.35rem; border-radius:4px; background:rgba(56,189,248,0.2); color:var(--primary); font-weight:600;">custom</span>' : '';
+        const displayUrl = p.baseUrl || p.defaultBaseUrl || '(padrão)';
         box.innerHTML =
           '<div class="provider-header">' +
             '<span class="provider-name">' + escapeHtml(p.name) + '</span>' +
             '<span class="status-dot" style="background:' + (p.enabled ? 'var(--emerald)' : 'var(--rose)') + ';box-shadow:0 0 8px ' + (p.enabled ? 'var(--emerald)' : 'var(--rose)') + '"></span>' +
           '</div>' +
-          '<span style="font-size:0.78rem; color: var(--text-muted);">' + (p.isBuiltIn ? 'Embutido' : 'Customizado') + ' · ' + (p.protocol || 'openai') + '</span>' +
+          '<div style="display:flex; align-items:center; justify-content:space-between; gap:0.4rem; font-size:0.75rem; color:var(--text-muted); margin-bottom:0.2rem;">' +
+            '<span>' + (p.isBuiltIn ? 'Embutido' : 'Customizado') + ' · ' + (p.protocol || 'openai') + '</span>' +
+            customBadge +
+          '</div>' +
+          '<div style="font-size:0.72rem; color:var(--text-muted); background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:0.25rem 0.5rem; margin-bottom:0.35rem; display:flex; align-items:center; gap:0.35rem; overflow:hidden;" title="' + escapeHtml(displayUrl) + '">' +
+            '<span>🌐</span>' +
+            '<span style="font-family:monospace; font-size:0.7rem; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all; cursor:text;">' + escapeHtml(displayUrl) + '</span>' +
+          '</div>' +
           '<span style="font-size:0.75rem; color: var(--primary); word-break:break-all;">Modelos (' + modelCount + '): ' + (p.models || []).slice(0, 3).join(', ') + (modelCount > 3 ? '...' : '') + '</span>' +
           '<span style="font-size:0.75rem; color: var(--text-muted);">' + (p.id === 'antigravity' ? 'Autenticação: <strong>Google OAuth (Code Assist)</strong>' : 'Chaves no Pool: <strong>' + keyCount + '</strong>') + '</span>' +
-          '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem;">' +
-            '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="toggleProvider(&apos;' + escapeHtml(p.id) + '&apos;,' + (p.enabled ? 'false' : 'true') + ')">' + (p.enabled ? 'Desativar' : 'Ativar') + '</button>' +
+          '<div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem;">' +
+            '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem;" onclick="toggleProvider(&apos;' + escapeHtml(p.id) + '&apos;,' + (p.enabled ? 'false' : 'true') + ')">' + (p.enabled ? 'Desativar' : 'Ativar') + '</button>' +
+            '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem;" onclick="openProviderEndpointModal(&apos;' + escapeHtml(p.id) + '&apos;)">🌐 Endpoint</button>' +
             (p.id === 'antigravity'
-              ? '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; border-color:var(--primary); color:var(--primary);" onclick="showTab(&apos;antigravity&apos;)">🔐 Google OAuth (' + keyCount + ' conta(s))</button>'
-              : '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="openProviderKeysModal(&apos;' + escapeHtml(p.id) + '&apos;)">🔑 Chaves (' + keyCount + ')</button>') +
-            '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="openProviderModelsModal(&apos;' + escapeHtml(p.id) + '&apos;)">🤖 Modelos (' + modelCount + ')</button>' +
-            (!p.isBuiltIn ? '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(244,63,94,0.15); color:var(--rose);" onclick="deleteCustomProvider(&apos;' + escapeHtml(p.id) + '&apos;)">Excluir</button>' : '') +
+              ? '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem; border-color:var(--primary); color:var(--primary);" onclick="showTab(&apos;antigravity&apos;)">🔐 Google OAuth (' + keyCount + ' conta(s))</button>'
+              : '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem;" onclick="openProviderKeysModal(&apos;' + escapeHtml(p.id) + '&apos;)">🔑 Chaves (' + keyCount + ')</button>') +
+            '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem;" onclick="openProviderModelsModal(&apos;' + escapeHtml(p.id) + '&apos;)">🤖 Modelos (' + modelCount + ')</button>' +
+            (!p.isBuiltIn ? '<button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.72rem; background:rgba(244,63,94,0.15); color:var(--rose);" onclick="deleteCustomProvider(&apos;' + escapeHtml(p.id) + '&apos;)">Excluir</button>' : '') +
           '</div>';
         grid.appendChild(box);
       });
@@ -2085,6 +2134,107 @@ git push origin master
       if (pid) openProviderKeysModal(pid);
     }
 
+    function getProviderEndpointHint(providerId) {
+      if (providerId === 'azure') {
+        return '<strong>Azure OpenAI:</strong> Informe a URL do seu recurso (ex: <code>https://seu-recurso.openai.azure.com</code>). O VeroRoute Edge roteará para seus deployments configurados.';
+      }
+      if (providerId === 'bedrock') {
+        return '<strong>AWS Bedrock:</strong> Informe a URL do proxy compatível com OpenAI (ex: Cloudflare AI Gateway <code>https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/aws-bedrock</code> ou LiteLLM).';
+      }
+      if (providerId === 'gemini') {
+        return '<strong>Google Gemini:</strong> Endpoint REST da API Google AI Studio (padrão: <code>https://generativelanguage.googleapis.com/v1beta</code>).';
+      }
+      if (providerId === '1min') {
+        return '<strong>1min.ai:</strong> Endpoint oficial da API (padrão: <code>https://api.1min.ai/api/chat-with-ai</code>).';
+      }
+      if (providerId === 'openai') {
+        return '<strong>OpenAI Oficial:</strong> Padrão <code>https://api.openai.com/v1</code> ou seu Cloudflare AI Gateway.';
+      }
+      return 'URL Base do provedor para chamadas de API e descoberta de modelos. Suporta Cloudflare AI Gateway, LiteLLM ou proxies privados.';
+    }
+
+    function openProviderEndpointModal(providerId) {
+      activeModalProviderId = providerId;
+      var p = (window._providersData || []).find(function(x) { return x.id === providerId; });
+      var provName = p ? p.name : providerId;
+      document.getElementById('mpe-title').innerText = '🌐 Endpoint: ' + provName;
+      var input = document.getElementById('mpe-baseurl');
+      if (input) input.value = p ? (p.baseUrl || p.defaultBaseUrl || '') : '';
+      var hintEl = document.getElementById('mpe-hint');
+      if (hintEl) hintEl.innerHTML = getProviderEndpointHint(providerId);
+      document.getElementById('modal-provider-endpoint').classList.add('active');
+    }
+
+    function closeProviderEndpointModal() {
+      document.getElementById('modal-provider-endpoint').classList.remove('active');
+    }
+
+    async function saveProviderEndpoint() {
+      if (!activeModalProviderId) return;
+      var input = document.getElementById('mpe-baseurl');
+      var newUrl = input ? input.value.trim() : '';
+      try {
+        var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/endpoint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseUrl: newUrl })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          showToast('Endpoint atualizado com sucesso!', 'success');
+          closeProviderEndpointModal();
+          await loadAdmin();
+        } else {
+          showToast('Erro ao salvar endpoint: ' + JSON.stringify(data.error || data), 'error');
+        }
+      } catch (e) {
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
+    async function resetProviderEndpoint() {
+      if (!activeModalProviderId) return;
+      try {
+        var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/endpoint', {
+          method: 'DELETE'
+        });
+        var data = await res.json();
+        if (data.ok) {
+          showToast('Endpoint restaurado para o padrão!', 'info');
+          closeProviderEndpointModal();
+          await loadAdmin();
+        } else {
+          showToast('Erro ao restaurar endpoint: ' + JSON.stringify(data.error || data), 'error');
+        }
+      } catch (e) {
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
+    async function saveEndpointFromModelsModal() {
+      if (!activeModalProviderId) return;
+      var input = document.getElementById('mpm-endpoint-input');
+      var newUrl = input ? input.value.trim() : '';
+      try {
+        var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/endpoint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseUrl: newUrl })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          showToast('Endpoint salvo com sucesso!', 'success');
+          await loadAdmin();
+          var p = (window._providersData || []).find(function(x) { return x.id === activeModalProviderId; });
+          if (p) p.baseUrl = data.baseUrl;
+        } else {
+          showToast('Erro ao salvar endpoint: ' + JSON.stringify(data.error || data), 'error');
+        }
+      } catch (e) {
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
     // Gerenciador de Modelos
     function openProviderModelsModal(providerId) {
       activeModalProviderId = providerId;
@@ -2097,6 +2247,13 @@ git push origin master
         var needsKey = p && (p.keyCount === 0 || !p.keyCount) && providerId !== 'cloudflare-ai' && providerId !== 'antigravity' && providerId !== 'pollinations' && providerId !== 'freeapikey';
         warnEl.style.display = needsKey ? 'flex' : 'none';
       }
+
+      var endpointInput = document.getElementById('mpm-endpoint-input');
+      if (endpointInput) endpointInput.value = p ? (p.baseUrl || p.defaultBaseUrl || '') : '';
+      var endpointHint = document.getElementById('mpm-endpoint-hint');
+      if (endpointHint) endpointHint.innerHTML = getProviderEndpointHint(providerId);
+      var keyInput = document.getElementById('mpm-key-input');
+      if (keyInput) keyInput.value = '';
 
       renderActiveModelsList();
 
@@ -2132,7 +2289,10 @@ git push origin master
       models.forEach(function(m) {
         var tag = document.createElement('span');
         tag.className = 'model-tag';
-        tag.innerHTML = escapeHtml(m) + '<span class="remove-btn" title="Remover modelo" onclick="removeModelFromActiveProvider(&apos;' + escapeHtml(m) + '&apos;)">✕</span>';
+        tag.innerHTML =
+          '<span style="user-select:all; cursor:text;">' + escapeHtml(m) + '</span>' +
+          '<button type="button" class="copy-icon-btn" title="Copiar modelo" style="background:none; border:none; cursor:pointer; font-size:0.75rem; padding:0 0.15rem; color:#fff;" onclick="event.stopPropagation(); navigator.clipboard.writeText(&apos;' + escapeHtml(m) + '&apos;).then(function(){ showToast(&apos;Modelo copiado!&apos;, &apos;success&apos;); });">📋</button>' +
+          '<span class="remove-btn" title="Remover modelo" onclick="removeModelFromActiveProvider(&apos;' + escapeHtml(m) + '&apos;)">✕</span>';
         container.appendChild(tag);
       });
     }
@@ -2168,6 +2328,11 @@ git push origin master
       var listContainer = document.getElementById('mpm-discovered-list');
       var addSelectedBtn = document.getElementById('mpm-btn-add-selected');
 
+      var endpointInput = document.getElementById('mpm-endpoint-input');
+      var endpointVal = endpointInput ? endpointInput.value.trim() : '';
+      var keyInput = document.getElementById('mpm-key-input');
+      var keyVal = keyInput ? keyInput.value.trim() : '';
+
       if (btn) {
         btn.disabled = true;
         btn.innerText = 'Buscando...';
@@ -2180,7 +2345,10 @@ git push origin master
         var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/fetch-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+          body: JSON.stringify({
+            apiKey: keyVal || undefined,
+            baseUrl: endpointVal || undefined
+          })
         });
         var data = await res.json();
         if (btn) {
@@ -2210,9 +2378,13 @@ git push origin master
             item.innerHTML =
               '<div style="display:flex; align-items:center; gap:0.5rem; overflow:hidden;">' +
                 '<input type="checkbox" class="disc-model-cb" value="' + escapeHtml(m) + '" ' + (isAlreadyActive ? 'checked disabled' : '') + ' style="cursor:pointer; flex-shrink:0;" />' +
-                '<span class="model-select-name" style="font-family:monospace; font-size:0.8rem; word-break:break-all;">' + escapeHtml(m) + '</span>' +
+                '<span class="model-select-name" style="font-family:monospace; font-size:0.8rem; word-break:break-all; user-select:all; cursor:text;">' + escapeHtml(m) + '</span>' +
+                '<button type="button" class="copy-icon-btn" title="Copiar identificador do modelo" style="background:none; border:none; cursor:pointer; font-size:0.8rem; padding:0 0.2rem;" onclick="event.stopPropagation(); navigator.clipboard.writeText(&apos;' + escapeHtml(m) + '&apos;).then(function(){ showToast(&apos;Modelo copiado!&apos;, &apos;success&apos;); });">📋</button>' +
               '</div>' +
-              (isAlreadyActive ? '<span style="font-size:0.72rem; color:var(--emerald); font-weight:600; flex-shrink:0;">ativo</span>' : '<button type="button" class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; flex-shrink:0;" onclick="quickAddSingleModel(&apos;' + escapeHtml(m) + '&apos;)">+ Adicionar</button>');
+              '<div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">' +
+                '<button type="button" class="btn btn-secondary" style="padding:0.2rem 0.45rem; font-size:0.68rem;" onclick="testSingleModel(&apos;' + escapeHtml(m) + '&apos;)">⚡ Testar</button>' +
+                (isAlreadyActive ? '<span style="font-size:0.72rem; color:var(--emerald); font-weight:600; padding:0 0.25rem;">ativo</span>' : '<button type="button" class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem;" onclick="quickAddSingleModel(&apos;' + escapeHtml(m) + '&apos;)">+ Adicionar</button>') +
+              '</div>';
             listContainer.appendChild(item);
           });
 
@@ -2230,6 +2402,59 @@ git push origin master
       }
     }
 
+    async function testSingleModel(modelName) {
+      if (!activeModalProviderId || !modelName) return;
+      var itemEl = document.querySelector('#mpm-discovered-list .model-select-item[data-model-name="' + modelName + '"]');
+      var oldBadge = itemEl ? itemEl.querySelector('.model-test-badge') : null;
+      if (oldBadge) oldBadge.remove();
+
+      var badge = document.createElement('span');
+      badge.className = 'model-test-badge badge-latency';
+      badge.style.fontSize = '0.7rem';
+      badge.style.marginLeft = '0.4rem';
+      badge.innerText = '⏳...';
+      if (itemEl) itemEl.appendChild(badge);
+
+      showToast('Testando ' + modelName + '...', 'info');
+
+      var endpointInput = document.getElementById('mpm-endpoint-input');
+      var endpointVal = endpointInput ? endpointInput.value.trim() : '';
+      var keyInput = document.getElementById('mpm-key-input');
+      var keyVal = keyInput ? keyInput.value.trim() : '';
+
+      try {
+        var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/test-models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: keyVal || undefined,
+            baseUrl: endpointVal || undefined,
+            models: [modelName]
+          })
+        });
+        var data = await res.json();
+        var r = data.results && data.results[0];
+        if (r) {
+          badge.className = 'model-test-badge badge-latency ' + (r.success ? 'ok' : 'err');
+          if (r.success) {
+            badge.innerText = '⚡ ' + r.latency_ms + 'ms · OK';
+            showToast('✅ ' + modelName + ' respondeu em ' + r.latency_ms + 'ms!', 'success');
+          } else {
+            var errBrief = r.status === 401 ? 'Sem Chave' : (r.status === 500 ? 'Erro 500' : 'Falhou (' + r.status + ')');
+            badge.innerText = '❌ ' + errBrief;
+            badge.title = r.error || 'Falha no teste';
+            showToast('❌ ' + modelName + ': ' + (r.error || errBrief), 'error');
+          }
+        } else {
+          badge.remove();
+          showToast('❌ Sem resposta do teste', 'error');
+        }
+      } catch (e) {
+        if (badge) badge.remove();
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
     async function testProviderModels() {
       if (!activeModalProviderId) return;
       var btn = document.getElementById('mpm-btn-test');
@@ -2240,11 +2465,19 @@ git push origin master
       }
       showToast('Testando modelos do provedor ' + activeModalProviderId + '...', 'info');
 
+      var endpointInput = document.getElementById('mpm-endpoint-input');
+      var endpointVal = endpointInput ? endpointInput.value.trim() : '';
+      var keyInput = document.getElementById('mpm-key-input');
+      var keyVal = keyInput ? keyInput.value.trim() : '';
+
       try {
         var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/test-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+          body: JSON.stringify({
+            apiKey: keyVal || undefined,
+            baseUrl: endpointVal || undefined
+          })
         });
         var data = await res.json();
         if (btn) {

@@ -166,6 +166,7 @@ export async function dispatchWithCascade(
       try {
         const credential = await selectActiveCredential(env, candidate.provider);
         const apiKey = credential.apiKey;
+        const customBaseUrl = adminCfg.providerBaseUrls?.[candidate.provider] || (candidate.provider === "azure" ? env.AZURE_OPENAI_ENDPOINT : undefined);
 
         let response: Response;
         try {
@@ -179,9 +180,9 @@ export async function dispatchWithCascade(
               return executeAntigravityRequest(outbound, antigravResult.accessToken, antigravResult.projectId || "", candidate.model);
             }
             if (candidate.provider === "1min") {
-              return executeOneMinAI(outbound, apiKey, candidate.model);
+              return executeOneMinAI(outbound, apiKey, candidate.model, customBaseUrl);
             }
-            return executeOpenAICompatible(outbound, candidate.provider, apiKey, candidate.model);
+            return executeOpenAICompatible(outbound, candidate.provider, apiKey, candidate.model, customBaseUrl);
           }, candidateTimeout);
         } catch (err) {
           if (err instanceof UpstreamTimeout) {

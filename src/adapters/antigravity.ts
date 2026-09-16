@@ -15,11 +15,22 @@ export async function executeAntigravityRequest(
 
   // Normaliza nome do modelo para o Code Assist
   const cleanModel = modelName.replace("antigravity/", "");
-  const upstreamModel = cleanModel.includes("claude")
-    ? "claude-3-7-sonnet"
-    : cleanModel.includes("flash")
-      ? "gemini-2.5-flash"
-      : "gemini-2.5-pro";
+  let upstreamModel = cleanModel;
+  if (cleanModel === "claude-3-7-sonnet" || cleanModel.includes("claude-3-7")) {
+    upstreamModel = "claude-3-7-sonnet";
+  } else if (cleanModel.includes("claude-3-5")) {
+    upstreamModel = "claude-3-5-sonnet";
+  } else if (cleanModel === "gemini-2.5-flash" || cleanModel.includes("2.5-flash")) {
+    upstreamModel = "gemini-2.5-flash";
+  } else if (cleanModel === "gemini-2.0-flash" || cleanModel.includes("2.0-flash")) {
+    upstreamModel = "gemini-2.0-flash";
+  } else if (cleanModel === "gemini-1.5-flash" || cleanModel.includes("1.5-flash")) {
+    upstreamModel = "gemini-1.5-flash";
+  } else if (cleanModel === "gemini-1.5-pro" || cleanModel.includes("1.5-pro")) {
+    upstreamModel = "gemini-1.5-pro";
+  } else if (cleanModel === "gemini-2.5-pro" || cleanModel.includes("2.5-pro")) {
+    upstreamModel = "gemini-2.5-pro";
+  }
 
   const isStream = request.stream ?? false;
   const endpoint = isStream

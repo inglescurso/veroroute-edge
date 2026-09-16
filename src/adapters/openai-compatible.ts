@@ -9,7 +9,8 @@ export async function executeOpenAICompatible(
   request: ChatCompletionRequest,
   providerId: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  overrideBaseUrl?: string
 ): Promise<Response> {
   const provider = getProviderConfig(providerId);
   if (!provider) {
@@ -20,10 +21,11 @@ export async function executeOpenAICompatible(
   if (providerId === "gemini") {
     const isStream = request.stream ?? false;
     const cleanModel = modelName.replace("gemini/", "");
+    const base = (overrideBaseUrl || provider.baseUrl || "https://generativelanguage.googleapis.com/v1beta").replace(/\/+$/, "");
     // FIX 1: non-streaming usa ?key=...; streaming usa ?alt=sse&key=...
     const url = isStream
-      ? `${provider.baseUrl}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
-      : `${provider.baseUrl}/models/${cleanModel}:generateContent?key=${apiKey}`;
+      ? `${base}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
+      : `${base}/models/${cleanModel}:generateContent?key=${apiKey}`;
 
     const geminiBody = formatOpenAIToGemini(request);
 
@@ -134,14 +136,16 @@ export async function executeOpenAICompatible(
     }
   }
 
-  const rawBase = provider.baseUrl || "";
+  const rawBase = (overrideBaseUrl || provider.baseUrl || "").replace(/\/+$/, "");
   let endpoint = `${rawBase}/chat/completions`;
   if (providerId === "azure") {
-    const cleanAzureBase = rawBase.replace(/\/+$/, "");
+    const cleanAzureBase = rawBase;
     const apiVersion = "2024-02-15-preview";
     endpoint = `${cleanAzureBase}/openai/deployments/${targetModel}/chat/completions?api-version=${apiVersion}`;
     headers["api-key"] = apiKey;
     delete headers["Authorization"];
+  } else if (rawBase.endsWith("/chat/completions")) {
+    endpoint = rawBase;
   }
   const bodyPayload = {
     ...request,
