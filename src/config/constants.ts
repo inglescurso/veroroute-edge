@@ -22,7 +22,10 @@ export const ANTIGRAVITY_PUBLIC_CONFIG = {
     "https://www.googleapis.com/auth/cclog",
     "https://www.googleapis.com/auth/experimentsandconfigs",
   ],
-  runtimeBaseUrl: "https://cloudcode-pa.googleapis.com",
+  // Host usado pelo CLI/IDE oficiais (o Account Switcher e o language_server
+  // apontam para o host "daily"). O host sem "daily" responde 429
+  // RESOURCE_EXHAUSTED para contas consumer mesmo com quota disponível.
+  runtimeBaseUrl: "https://daily-cloudcode-pa.googleapis.com",
   loadCodeAssistPath: "/v1internal:loadCodeAssist",
   onboardUserPath: "/v1internal:onboardUser",
   // RPC oficial de descoberta de modelos do Cloud Code Assist.
