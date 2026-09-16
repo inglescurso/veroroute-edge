@@ -1968,7 +1968,7 @@ git push origin master
         box.innerHTML = '<strong>Provedor:</strong> ' + escapeHtml(provName) + '<br>' +
           '<div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:6px; padding:0.6rem; margin-top:0.4rem; font-size:0.8rem; color:#cbd5e1;">' +
             'ℹ️ O <strong>Antigravity CLI</strong> conecta diretamente com sua conta Google através de OAuth. Ele <strong>não necessita</strong> de chaves de API manuais inseridas aqui.<br>' +
-            '<button type="button" class="btn" style="margin-top:0.5rem; font-size:0.8rem; padding:0.35rem 0.75rem;" onclick="closeProviderKeysModal(); showTab(\'antigravity\');">🔐 Conectar Conta Google (Antigravity OAuth) ↗</button>' +
+            '<button type="button" class="btn" style="margin-top:0.5rem; font-size:0.8rem; padding:0.35rem 0.75rem;" onclick="closeProviderKeysModal(); showTab(&apos;antigravity&apos;);">🔐 Conectar Conta Google (Antigravity OAuth) ↗</button>' +
           '</div>';
       } else {
         box.innerHTML = '<strong>Provedor:</strong> ' + escapeHtml(provName) + ' (' + escapeHtml(p ? p.protocol || 'openai' : '') + ')<br>' +
