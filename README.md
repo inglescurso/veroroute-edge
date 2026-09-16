@@ -5,7 +5,7 @@
 ### Aerodynamic Serverless AI Gateway & Smart Router for Cloudflare Workers
 ### Gateway de IA Serverless Aerodinâmico e Roteador Inteligente para Cloudflare Workers
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/samucamg/veroroute-edge)
+[![Fork on GitHub](https://img.shields.io/badge/Fork%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/samucamg/veroroute-edge/fork)
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
@@ -16,6 +16,16 @@
 [![Documentation](https://img.shields.io/badge/Docs-veroroute.24hs.eu.org-0e7488?style=for-the-badge)](https://veroroute.24hs.eu.org/)
 
 **[🇺🇸 English](#english) · [🇧🇷 Português](#portugues)**
+
+> [!IMPORTANT]
+> **Never install VeroRoute Edge with the one-click `Deploy to Cloudflare` button.**
+> That kind of deploy creates a detached Worker that **never receives another update**.
+> Because the project is in active beta, always install it through a **fork** of this repository,
+> which keeps your instance updatable with a single **Sync fork → Update branch** click.
+>
+> **PT-BR:** **Não instale pelo botão de deploy em um clique.** Esse tipo de instalação cria um Worker desconectado que **nunca mais recebe atualizações**. Como o projeto está em beta ativo, faça sempre o **fork** e conecte o GitHub à Cloudflare.
+>
+> 🚀 **Guia de implantação / Deployment guide:** [veroroute.24hs.eu.org/#deploy](https://veroroute.24hs.eu.org/#deploy)
 
 </div>
 
