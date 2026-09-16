@@ -519,6 +519,7 @@ export function renderDashboardHtml(): string {
         <div class="brand-title">VeroRoute Edge</div>
       </div>
       <span class="badge-edge">Serverless Edge</span>
+      <span id="header-storage-badge" class="badge-edge" style="display: none;"></span>
       <a href="${UPSTREAM_REPO_URL}" target="_blank" rel="noopener noreferrer" class="badge-edge badge-upstream" title="Repositório Upstream Oficial">
         Upstream: ${UPSTREAM_REPO_NAME} · v${APP_VERSION} (${APP_COMMIT_SHA}) ↗
       </a>
@@ -979,9 +980,11 @@ dsh --model combo-super-payload
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.35rem;">
               Upstream Oficial: <a href="${UPSTREAM_REPO_URL}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 600; text-decoration: none;">${UPSTREAM_REPO_NAME} ↗</a> · Autor: <strong>${UPSTREAM_AUTHOR}</strong>
             </p>
-            <p id="kv-status-message" style="color: #64748b; font-size: 0.8rem; line-height: 1.4;">
-              Esta instância serverless roda sobre Cloudflare Workers & KV. Todas as credenciais cadastradas abaixo persistem no namespace <code>OMNI_KEYS</code> mesmo após atualizações do código upstream.
-            </p>
+            <div id="kv-status-banner">
+              <p id="kv-status-message" style="color: #64748b; font-size: 0.8rem; line-height: 1.4;">
+                Carregando status de persistência do Cloudflare KV...
+              </p>
+            </div>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <button class="btn btn-secondary" onclick="checkForUpstreamUpdates(this)" style="font-size: 0.82rem; padding: 0.45rem 0.85rem;">
@@ -1454,18 +1457,23 @@ dsh --model combo-super-payload
       <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 0.5rem;">🔄 Como Atualizar Sua Instância (Sem Perder Configurações)</div>
         <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.6rem;">
-          Ao implantar via <em>Deploy to Cloudflare</em>, um repositório é clonado na sua conta. Suas chaves de provedores, combos e configurações são armazenadas no Cloudflare KV (<code>OMNI_KEYS</code> e <code>OMNI_CACHE</code>). Atualizar o código <strong>NÃO</strong> apaga suas chaves nem configurações.
+          Suas chaves de provedores, combos e configurações são armazenadas no Cloudflare KV (<code>OMNI_KEYS</code> e <code>OMNI_CACHE</code>). Atualizar o código <strong>NUNCA</strong> apaga suas chaves nem configurações.
         </p>
-        <div style="font-size: 0.82rem; color: #fff; font-weight: 600; margin-bottom: 0.35rem;">Opção 1: Via Git CLI (Recomendado)</div>
+        <div style="font-size: 0.82rem; color: var(--primary); font-weight: 600; margin-bottom: 0.35rem;">Opção 1: Via GitHub "Sync Fork" (Mais Fácil / Sem Comandos)</div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+          Se você conectou seu GitHub à Cloudflare: abra o repositório do seu Fork no GitHub, clique no botão <strong>Sync fork</strong> ➔ <strong>Update branch</strong>. A Cloudflare detectará a mudança e atualizará seu Worker automaticamente em menos de 1 minuto!
+        </p>
+
+        <div style="font-size: 0.82rem; color: #fff; font-weight: 600; margin-bottom: 0.35rem;">Opção 2: Via Git CLI</div>
         <div class="code-box" style="font-size: 0.78rem; padding: 0.6rem; margin-bottom: 0.75rem;">
 git remote add upstream ${UPSTREAM_REPO_URL}.git<br>
 git pull upstream master<br>
-npx wrangler deploy
+git push origin master
         </div>
 
-        <div style="font-size: 0.82rem; color: #fff; font-weight: 600; margin-bottom: 0.35rem;">Opção 2: Via Cloudflare Dashboard</div>
+        <div style="font-size: 0.82rem; color: #fff; font-weight: 600; margin-bottom: 0.35rem;">Opção 3: Redeploy no Cloudflare Dashboard</div>
         <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-          No painel do Cloudflare Workers & Pages, acione um <em>Redeploy</em> a partir do commit sincronizado da branch <code>master</code>, ou faça o redeploy via Wrangler CLI. Seus namespaces de KV permanecerão vinculados.
+          No painel do Cloudflare Workers & Pages, acione um <em>Redeploy</em> a partir do commit da branch <code>master</code>. Seus namespaces de KV permanecerão vinculados.
         </p>
       </div>
 
@@ -1845,16 +1853,54 @@ npx wrangler deploy
         renderAdminProviders(window._providersData);
         if (statusEl) statusEl.innerText = window._providersData.length + ' provedores carregados';
         
-        const kvStatusEl = document.getElementById('kv-status-message');
-        if (kvStatusEl) {
-          if (data.hasKV) {
-            kvStatusEl.innerHTML = 'Esta instância serverless roda sobre Cloudflare Workers & KV. Todas as credenciais cadastradas abaixo persistem no namespace <code>OMNI_KEYS</code> mesmo após atualizações do código upstream.';
-            kvStatusEl.style.color = '#64748b';
-            kvStatusEl.style.fontWeight = 'normal';
-          } else {
-            kvStatusEl.innerHTML = '⚠️ <strong>ALERTA DE MEMÓRIA VOLÁTIL:</strong> O banco de dados KV (OMNI_KEYS) não foi encontrado ou não está vinculado. O sistema está rodando com armazenamento "em memória". <strong>Todas as configurações e chaves serão PERDIDAS quando o Worker reiniciar</strong> (por inatividade ou atualização do GitHub). Leia as instruções do README para vincular o seu KV no wrangler.toml.';
-            kvStatusEl.style.color = '#f43f5e';
-            kvStatusEl.style.fontWeight = '500';
+        const kvStatusContainer = document.getElementById('kv-status-banner');
+        const headerStorageBadge = document.getElementById('header-storage-badge');
+        
+        if (data.hasKV) {
+          if (headerStorageBadge) {
+            headerStorageBadge.style.display = 'inline-block';
+            headerStorageBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            headerStorageBadge.style.color = 'var(--emerald)';
+            headerStorageBadge.innerHTML = '🟢 KV Ativo (Permanente)';
+          }
+          if (kvStatusContainer) {
+            kvStatusContainer.innerHTML =
+              '<div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.5rem;">' +
+                '<div style="color: var(--emerald); font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">' +
+                  '<span>✅ Persistência Cloudflare KV Ativa (OMNI_KEYS)</span>' +
+                '</div>' +
+                '<div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.3rem; line-height: 1.4;">' +
+                  'Todas as credenciais de provedores, configurações e tokens persistem no banco KV. Sincronizações com o GitHub não apagarão seus dados.' +
+                '</div>' +
+              '</div>';
+          }
+        } else {
+          if (headerStorageBadge) {
+            headerStorageBadge.style.display = 'inline-block';
+            headerStorageBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+            headerStorageBadge.style.color = '#fb7185';
+            headerStorageBadge.innerHTML = '⚠️ Memória Volátil (Sem KV)';
+          }
+          if (kvStatusContainer) {
+            kvStatusContainer.innerHTML =
+              '<div style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: 8px; padding: 0.9rem; margin-top: 0.75rem;">' +
+                '<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">' +
+                  '<span style="font-weight: 700; color: #fb7185; font-size: 0.92rem;">⚠️ ALERTA: Armazenamento em Memória Volátil Ativo</span>' +
+                  '<button class="btn btn-secondary" onclick="loadAdmin()" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;">🔄 Re-testar KV</button>' +
+                '</div>' +
+                '<p style="color: #cbd5e1; font-size: 0.82rem; line-height: 1.45; margin-bottom: 0.6rem;">' +
+                  'O banco de dados <code>OMNI_KEYS</code> não foi detectado neste Worker. O sistema está rodando na <strong>memória RAM temporária</strong> e <strong>perderá todas as chaves e configurações</strong> assim que o Worker reiniciar (por inatividade ou novo deploy).' +
+                '</p>' +
+                '<div style="background: rgba(15, 23, 42, 0.7); border-radius: 6px; padding: 0.6rem 0.85rem; font-size: 0.8rem; color: #94a3b8; line-height: 1.6;">' +
+                  '<strong style="color: #fff;">Como vincular seu KV na Cloudflare em 1 minuto:</strong><br>' +
+                  '1. No painel da Cloudflare, acesse <strong>Workers & Pages</strong> ➔ clique no seu Worker.<br>' +
+                  '2. Vá em <strong>Settings</strong> ➔ <strong>Bindings</strong> (ou Variables &amp; Bindings).<br>' +
+                  '3. Clique em <strong>Add</strong> ➔ selecione <strong>KV Namespace</strong>.<br>' +
+                  '4. Defina <strong>Variable name:</strong> <code>OMNI_KEYS</code> e selecione o seu namespace KV de chaves.<br>' +
+                  '5. Repita para <strong>Variable name:</strong> <code>OMNI_CACHE</code> selecionando seu KV de cache.<br>' +
+                  '6. Clique em <strong>Save and Deploy</strong> e depois clique no botão "Re-testar KV" acima!' +
+                '</div>' +
+              '</div>';
           }
         }
       } catch (e) {
@@ -1881,10 +1927,12 @@ npx wrangler deploy
           '</div>' +
           '<span style="font-size:0.78rem; color: var(--text-muted);">' + (p.isBuiltIn ? 'Embutido' : 'Customizado') + ' · ' + (p.protocol || 'openai') + '</span>' +
           '<span style="font-size:0.75rem; color: var(--primary); word-break:break-all;">Modelos (' + modelCount + '): ' + (p.models || []).slice(0, 3).join(', ') + (modelCount > 3 ? '...' : '') + '</span>' +
-          '<span style="font-size:0.75rem; color: var(--text-muted);">Chaves no Pool: <strong>' + keyCount + '</strong></span>' +
+          '<span style="font-size:0.75rem; color: var(--text-muted);">' + (p.id === 'antigravity' ? 'Autenticação: <strong>Google OAuth (Code Assist)</strong>' : 'Chaves no Pool: <strong>' + keyCount + '</strong>') + '</span>' +
           '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem;">' +
             '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="toggleProvider(&apos;' + escapeHtml(p.id) + '&apos;,' + (p.enabled ? 'false' : 'true') + ')">' + (p.enabled ? 'Desativar' : 'Ativar') + '</button>' +
-            '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="openProviderKeysModal(&apos;' + escapeHtml(p.id) + '&apos;)">🔑 Chaves (' + keyCount + ')</button>' +
+            (p.id === 'antigravity'
+              ? '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; border-color:var(--primary); color:var(--primary);" onclick="showTab(&apos;antigravity&apos;)">🔐 Google OAuth (' + keyCount + ' conta(s))</button>'
+              : '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="openProviderKeysModal(&apos;' + escapeHtml(p.id) + '&apos;)">🔑 Chaves (' + keyCount + ')</button>') +
             '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="openProviderModelsModal(&apos;' + escapeHtml(p.id) + '&apos;)">🤖 Modelos (' + modelCount + ')</button>' +
             (!p.isBuiltIn ? '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(244,63,94,0.15); color:var(--rose);" onclick="deleteCustomProvider(&apos;' + escapeHtml(p.id) + '&apos;)">Excluir</button>' : '') +
           '</div>';
@@ -1916,8 +1964,16 @@ npx wrangler deploy
 
       const count = p ? (p.keyCount !== undefined ? p.keyCount : (p.keys ? p.keys.length : 0)) : 0;
       const box = document.getElementById('mpk-status-box');
-      box.innerHTML = '<strong>Provedor:</strong> ' + escapeHtml(provName) + ' (' + escapeHtml(p ? p.protocol || 'openai' : '') + ')<br>' +
-        '<strong>Status do Pool:</strong> ' + (count > 0 ? '<span style="color:var(--emerald); font-weight:600;">' + count + ' chave(s) ativa(s) no balanceamento</span>' : '<span style="color:var(--amber);">Nenhuma chave cadastrada neste Worker</span>');
+      if (providerId === 'antigravity') {
+        box.innerHTML = '<strong>Provedor:</strong> ' + escapeHtml(provName) + '<br>' +
+          '<div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:6px; padding:0.6rem; margin-top:0.4rem; font-size:0.8rem; color:#cbd5e1;">' +
+            'ℹ️ O <strong>Antigravity CLI</strong> conecta diretamente com sua conta Google através de OAuth. Ele <strong>não necessita</strong> de chaves de API manuais inseridas aqui.<br>' +
+            '<button type="button" class="btn" style="margin-top:0.5rem; font-size:0.8rem; padding:0.35rem 0.75rem;" onclick="closeProviderKeysModal(); showTab(\'antigravity\');">🔐 Conectar Conta Google (Antigravity OAuth) ↗</button>' +
+          '</div>';
+      } else {
+        box.innerHTML = '<strong>Provedor:</strong> ' + escapeHtml(provName) + ' (' + escapeHtml(p ? p.protocol || 'openai' : '') + ')<br>' +
+          '<strong>Status do Pool:</strong> ' + (count > 0 ? '<span style="color:var(--emerald); font-weight:600;">' + count + ' chave(s) ativa(s) no balanceamento</span>' : '<span style="color:var(--amber);">Nenhuma chave cadastrada neste Worker</span>');
+      }
 
       document.getElementById('mpk-new-key').value = '';
       document.getElementById('modal-provider-keys').classList.add('active');

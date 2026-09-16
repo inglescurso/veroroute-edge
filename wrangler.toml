@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-02-24"
 compatibility_flags = ["nodejs_compat"]
 
+# Permite manter variaveis e segredos configurados no Cloudflare Dashboard sem que deploys do GitHub os sobrescrevam
+keep_vars = true
+
 [ai]
 binding = "AI"
 
@@ -26,12 +29,13 @@ QUOTA_WINDOW_SECONDS = "60"
 [observability]
 enabled = true
 
-# Corrigido: Removido caracteres invalidos e forçado conflito para limpeza
-
+# ==============================================================================
+# BINDINGS DE PERSISTENCIA (Cloudflare KV - Automatic Resource Provisioning):
+# Ao omitir o campo "id", o Cloudflare Workers (Wrangler) cria e vincula os KVs
+# automaticamente na conta do usuario durante o deploy (100% zero configuracao manual).
+# ==============================================================================
 [[kv_namespaces]]
 binding = "OMNI_KEYS"
-id = ""
 
 [[kv_namespaces]]
 binding = "OMNI_CACHE"
-id = ""

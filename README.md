@@ -48,29 +48,32 @@
 
 ---
 
-## ⚡ 1-Click Deploy — one-token setup
+## ⚡ Deployment Guide
 
-Deploy directly to your Cloudflare Workers account with one click:
+### 🚀 Recommended: GitHub Fork + Cloudflare Workers (Easiest & Keeps Updated)
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/samucamg/veroroute-edge)
+Because **VeroRoute Edge** is in active beta development with continuous provider additions and fixes, connecting via your GitHub Fork is the best approach. It allows you to update your instance with **one click** without breaking your credentials.
 
-The first-run form intentionally asks for **one secret only**: `AUTH_TOKEN`.
-Do not enter dummy values such as `12345` for OpenAI, Gemini, Groq or other
-providers: provider credentials are configured after deployment in the built-in
-**Administration** panel.
+1. **Fork the Repository**:
+   Click the **Fork** button at the top-right of this repository to create your copy on GitHub.
 
-During the Cloudflare resource step, create or select `OMNI_CACHE` and
-`OMNI_KEYS`. They are Cloudflare KV storage bindings, not API credentials. After
-deployment, open the Worker URL, enter Administration using `AUTH_TOKEN`, and
-add only the providers you use. Workers AI and keyless providers work without
-an external provider key.
+2. **Deploy from Cloudflare Workers**:
+   - In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Continue with GitHub**.
+   - Select your forked `veroroute-edge` repository and click **Deploy**.
+   - ⚡ **Zero Setup Required**: Cloudflare automatically provisions and links your `OMNI_KEYS` and `OMNI_CACHE` KV databases during the build!
 
-Environment variables such as `OPENAI_API_KEYS` remain supported only as an
-optional advanced/legacy alternative.
+3. **Set Your Master Password (`AUTH_TOKEN`)**:
+   - Once deployed, open your Worker > **Settings** > **Variables and Secrets**.
+   - Click **Add**, set Variable name: `AUTH_TOKEN`, Value: your strong password.
+   - Check **Encrypt (Secret)** and click **Deploy**.
 
-### Manual CLI Deployment (Recommended)
+> 💡 **Staying Updated**: When new features or providers are released, open your GitHub fork and click **Sync fork** ➔ **Update branch**. Cloudflare automatically redeploys your Worker in under a minute, keeping all stored credentials and configurations completely safe in KV!
 
-To ensure a safe deployment where all configurations and secrets are properly set up before using the application, follow this exact order:
+---
+
+### 💻 Alternative: Manual CLI Deployment
+
+For developers who prefer using the command line:
 
 ```bash
 # 1. Clone repository
@@ -84,38 +87,15 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Update wrangler.toml
-# Replace the empty `id = ""` strings with your generated KV IDs from step 3.
+# 4. Bind in wrangler.toml or Dashboard
+# Uncomment the kv_namespaces block in wrangler.toml with your generated IDs.
 
 # 5. Deploy to Cloudflare Workers
-# You must deploy first before adding secrets if this is your first time.
 npx wrangler deploy
 
 # 6. Set mandatory master AUTH_TOKEN secret
-# Type a strong password and hit Enter when prompted.
 npx wrangler secret put AUTH_TOKEN
 ```
-
-### 🔄 Staying Updated with the Official Upstream
-
-When you deploy via the **Deploy to Cloudflare** button, Cloudflare creates a repository clone under your GitHub account. Because **VeroRoute Edge** continues receiving security fixes, provider adapters, and performance enhancements in the official upstream repository, you should keep your instance synced:
-
-- **Via Git CLI (Recommended)**:
-  ```bash
-  # Add the official upstream remote
-  git remote add upstream https://github.com/samucamg/veroroute-edge.git
-
-  # Fetch and merge upstream changes
-  git pull upstream master
-
-  # Redeploy to Cloudflare Workers
-  npx wrangler deploy
-  ```
-
-- **Via Cloudflare Dashboard**:
-  In the Cloudflare Workers & Pages dashboard, trigger a build/redeploy from your updated branch.
-
-> 💡 **Zero Config Loss Guarantee**: All your provider keys, custom combos, search configurations, and OAuth tokens are stored in the Cloudflare KV namespaces (`OMNI_KEYS` and `OMNI_CACHE`). Updating the application code will **never** overwrite or delete your stored credentials and settings!
 
 ---
 
@@ -195,15 +175,32 @@ O **VeroRoute Edge** é um gateway de IA serverless e roteador inteligente proje
 
 ---
 
-## ⚡ Implantação em 1 Clique
+## ⚡ Guia de Implantação
 
-Implante diretamente na sua conta do Cloudflare Workers com apenas um clique:
+### 🚀 Método Recomendado: Fork no GitHub + Cloudflare Workers (Mais Fácil e com Atualizações)
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/samucamg/veroroute-edge)
+Como o **VeroRoute Edge** está em desenvolvimento beta ativo com constantes novos provedores e correções, conectar via Fork do seu GitHub é o método mais recomendado. Ele permite que qualquer usuário atualize sua instância com **1 clique** sem perder chaves nem configurações.
 
-### Implantação Manual via CLI (Recomendado)
+1. **Faça o Fork do Repositório**:
+   Clique no botão **Fork** no canto superior direito deste repositório para criar sua cópia pessoal no GitHub.
 
-O fluxo ideal para implantação manual segura via CLI garante que nenhuma configuração falte antes de usar a aplicação. Siga os passos na ordem correta:
+2. **Faça o Deploy Conectando o GitHub na Cloudflare**:
+   - No [Painel da Cloudflare](https://dash.cloudflare.com/), acesse **Workers & Pages** > **Create application** > **Continue with GitHub**.
+   - Selecione o seu repositório `veroroute-edge` e clique em **Deploy**.
+   - ⚡ **Zero Configuração Manual de KV**: O Cloudflare Workers cria e vincula automaticamente os bancos `OMNI_KEYS` e `OMNI_CACHE` na sua conta durante a compilação!
+
+3. **Defina a Senha Mestra Segura (`AUTH_TOKEN`)**:
+   - No seu Worker recém-criado, acesse **Settings** > **Variables and Secrets**.
+   - Clique em **Add**, defina o nome como `AUTH_TOKEN`, digite sua senha forte e marque **Encrypt (Secret)**.
+   - Clique em **Deploy**.
+
+> 💡 **Como Atualizar Sua Instância**: Quando uma nova versão for lançada no repositório oficial, abra o seu Fork no GitHub e clique em **Sync fork** ➔ **Update branch**. A Cloudflare detectará a mudança e atualizará seu Worker em menos de 1 minuto, preservando 100% das suas chaves e configurações no KV!
+
+---
+
+### 💻 Alternativa: Implantação Manual via CLI
+
+Para desenvolvedores que preferem a linha de comando:
 
 ```bash
 # 1. Clonar repositório
@@ -217,38 +214,14 @@ npm install
 npx wrangler kv namespace create OMNI_CACHE
 npx wrangler kv namespace create OMNI_KEYS
 
-# 4. Atualizar o arquivo wrangler.toml
-# Substitua as strings vazias `id = ""` pelos IDs gerados no passo 3.
+# 4. Descomentar kv_namespaces no wrangler.toml com os IDs gerados
 
 # 5. Realizar o deploy no Cloudflare Workers
-# É importante fazer o deploy antes de configurar os secrets (se for a primeira vez).
 npx wrangler deploy
 
 # 6. Definir a chave mestre AUTH_TOKEN
-# Digite uma senha forte e pressione Enter quando solicitado.
 npx wrangler secret put AUTH_TOKEN
 ```
-
-### 🔄 Como Manter sua Instância Atualizada com o Upstream Oficial
-
-Ao implantar pelo botão **Deploy to Cloudflare**, a Cloudflare cria uma cópia (clone) do repositório sob a sua conta do GitHub. Como o **VeroRoute Edge** continua recebendo melhorias constantes, novos provedores e correções de segurança no repositório oficial, você pode manter sua instância sincronizada:
-
-- **Via Git CLI (Recomendado)**:
-  ```bash
-  # Adicione o repositório upstream oficial como remote
-  git remote add upstream https://github.com/samucamg/veroroute-edge.git
-
-  # Puxe as atualizações mais recentes
-  git pull upstream master
-
-  # Faça o redeploy para o Cloudflare Workers
-  npx wrangler deploy
-  ```
-
-- **Via Cloudflare Dashboard**:
-  No painel do Cloudflare Workers & Pages, acione um redeploy a partir da sua branch `master` atualizada.
-
-> 💡 **Garantia de Preservação das Configurações**: Todas as suas chaves de API, modelos, rotas de combo e tokens OAuth ficam armazenados com segurança nos Namespaces do Cloudflare KV (`OMNI_KEYS` e `OMNI_CACHE`). Atualizar o código do worker **nunca** apaga suas configurações ou credenciais salvas!
 
 ---
 
