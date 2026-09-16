@@ -228,8 +228,8 @@ O gateway possui uma interface visual integrada acessível diretamente no navega
 
 - Os endpoints `/api/mcp/*` só existem com `ENABLE_MCP_SERVER=true`.
 - O `AUTH_TOKEN` é o token mestre; chaves virtuais `sk-vr-*` acessam apenas `/v1/*`.
-- Em uma instalação nova, o painel inicia com a senha padrão `admin`; troque-a em **Settings → Variables and Secrets**.
-- Após um **Sync fork**, confira essa variável: builds anteriores podiam reaplicar o valor padrão.
+- Em uma instalação nova, o painel já funciona com a senha padrão `admin`; troque-a em **Settings → Variables and Secrets**.
+- `AUTH_TOKEN = admin` permanece no `wrangler.toml` para que a instalação nova funcione de imediato. Consequência: **cada Sync fork pode reaplicar `admin`** e substituir a senha personalizada. Após atualizar, confira **Settings → Variables and Secrets**, restaure sua senha e clique em Deploy. Chaves, combos e configurações no KV não são afetados.
 
 ---
 ## 13. Guia de Variáveis de Ambiente & Bindings

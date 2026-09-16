@@ -2,11 +2,9 @@ import type { Context } from "hono";
 import { getAdminConfig } from "./store";
 import type { EnvBindings } from "@/types/provider";
 
-// AUTH_TOKEN is configurable. Fresh installs use this documented fallback.
-// Keeping the fallback here (and not in wrangler.toml) prevents Sync fork
-// builds from overwriting a password set in the Cloudflare Dashboard.
-// ATTENTION: do not add AUTH_TOKEN back to wrangler.toml [vars].
-const DEFAULT_AUTH_TOKEN = "admin";
+// AUTH_TOKEN is configured by wrangler.toml for fresh installations.
+// Cloudflare Git builds can re-apply the default value from [vars], so users
+// who chose a custom password must review it after each Sync fork/rebuild.
 
 export type AuthPrincipal =
   | { kind: "master"; id: "master" }
@@ -28,7 +26,8 @@ export async function resolvePrincipal(
   c: AnyCtx,
   token: string
 ): Promise<AuthPrincipal | null> {
-  const master = c.env.AUTH_TOKEN?.trim() || DEFAULT_AUTH_TOKEN;
+  const master = c.env.AUTH_TOKEN;
+  if (!master) return null;
 
   if (token && token === master) {
     return { kind: "master", id: "master" };

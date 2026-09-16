@@ -1568,6 +1568,9 @@ dsh --model combo-super-payload
         <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.6rem;">
           Suas chaves de provedores, combos e configurações são armazenadas no Cloudflare KV (<code>OMNI_KEYS</code> e <code>OMNI_CACHE</code>). Atualizar o código <strong>NUNCA</strong> apaga suas chaves nem configurações.
         </p>
+        <p style="font-size: 0.82rem; color: var(--amber); line-height: 1.5; margin-bottom: 0.6rem;">
+          ⚠️ <strong>Atenção ao <code>AUTH_TOKEN</code>:</strong> o valor padrão <code>admin</code> fica no <code>wrangler.toml</code> para que instalações novas já funcionem. Por isso, cada <strong>Sync fork</strong> ou novo build pode devolver a variável para <code>admin</code> e substituir a senha que você definiu. Depois de atualizar, abra Settings → Variables and Secrets, confira o <code>AUTH_TOKEN</code>, salve novamente sua senha e clique em Deploy.
+        </p>
         <div style="font-size: 0.82rem; color: var(--primary); font-weight: 600; margin-bottom: 0.35rem;">Opção 1: Via GitHub "Sync Fork" (Mais Fácil / Sem Comandos)</div>
         <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
           Se você conectou seu GitHub à Cloudflare: abra o repositório do seu Fork no GitHub, clique no botão <strong>Sync fork</strong> ➔ <strong>Update branch</strong>. A Cloudflare detectará a mudança e atualizará seu Worker automaticamente em menos de 1 minuto!

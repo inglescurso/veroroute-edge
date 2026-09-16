@@ -85,7 +85,7 @@ This is the official, tested path. The fork stays connected to Cloudflare, the K
    ⚡ **Zero KV setup**: Cloudflare provisions and links `OMNI_KEYS` and `OMNI_CACHE` automatically during the build.
    Fresh installations start with the documented default **`admin`** so you can log in immediately — change it right away.
 
-> ⚠️ **After every Sync fork**: a new build can re-apply the default `admin` value. The variable is no longer shipped in `wrangler.toml`, but if your instance was created before that change, re-check **Settings → Variables and Secrets** after syncing and restore your password when needed.
+> ⚠️ **Important — after every Sync fork / rebuild**: `AUTH_TOKEN` is shipped in `wrangler.toml` so a fresh install already works with the default password `admin`. Because that repository file always carries the default, each new build started by **Sync fork** may reset the variable to `admin`, replacing a password you typed in the Dashboard. Whenever you update the instance, open **Settings → Variables and Secrets**, check `AUTH_TOKEN` and, if it was reset, save your own password again and click **Deploy**. This is expected behaviour, not data loss: your provider keys, combos and settings in KV are untouched.
 
 > 💡 **Staying updated**: open your fork and click **Sync fork ➔ Update branch**. Cloudflare redeploys automatically in about a minute and your provider keys, combos and settings remain stored in KV.
 
@@ -244,7 +244,7 @@ Este é o caminho oficial e testado. O fork permanece conectado à Cloudflare, o
    ⚡ **Zero configuração de KV**: a Cloudflare cria e vincula `OMNI_KEYS` e `OMNI_CACHE` automaticamente durante o build.
    A instalação nova inicia com a senha padrão documentada **`admin`**, permitindo o primeiro acesso imediato — troque-a logo depois.
 
-> ⚠️ **Depois de cada Sync fork**: um novo build pode reaplicar o valor padrão `admin`. A variável não é mais enviada pelo `wrangler.toml`, mas se a sua instância foi criada antes dessa mudança, confira **Settings → Variables and Secrets** após sincronizar e restaure sua senha quando necessário.
+> ⚠️ **Importante — depois de cada Sync fork / novo build**: o `AUTH_TOKEN` fica no `wrangler.toml` justamente para que a instalação nova já funcione com a senha padrão `admin`. Como o arquivo do repositório sempre traz esse valor, cada build disparado pelo **Sync fork** pode devolver a variável para `admin` e substituir a senha que você definiu no painel. Sempre que atualizar a instância, abra **Settings → Variables and Secrets**, confira o `AUTH_TOKEN` e, se ele voltou para `admin`, salve novamente a sua senha e clique em **Deploy**. Isso é esperado e não apaga nada: suas chaves de provedores, combos e configurações continuam no KV.
 
 > 💡 **Como manter atualizado**: abra o seu fork e clique em **Sync fork ➔ Update branch**. A Cloudflare refaz o deploy automaticamente em cerca de um minuto e suas chaves de provedores, combos e configurações continuam guardados no KV.
 
