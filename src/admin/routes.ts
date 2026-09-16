@@ -25,7 +25,12 @@ import type { EnvBindings } from "@/types/provider";
 import { getUsageSummary } from "@/routing/costTracker";
 import { getCircuitStatus } from "@/routing/circuitBreaker";
 import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
-import { isOpenAICompatBaseUrl, normalizeProviderId, stripTrailingSlashes } from "@/config/providerAliases";
+import {
+  isOpenAICompatBaseUrl,
+  normalizeProviderId,
+  resolveGeminiSurface,
+  stripTrailingSlashes,
+} from "@/config/providerAliases";
 import {
   fetchAntigravityAvailableModels,
   fetchGeminiOpenAICompatModels,
@@ -388,8 +393,13 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       "aqa",
     ];
     // A Base URL efetiva decide a superfície: nativa (?key=) ou compatível com OpenAI (Bearer).
-    const geminiBaseUrl = stripTrailingSlashes(customBaseUrl || GEMINI_NATIVE_BASE_URL);
-    const geminiUsesOpenAICompat = isOpenAICompatBaseUrl(geminiBaseUrl);
+    const requestedGeminiBaseUrl = stripTrailingSlashes(customBaseUrl || GEMINI_NATIVE_BASE_URL);
+    const geminiUsesOpenAICompat = resolveGeminiSurface(requestedGeminiBaseUrl, apiKey) === "openai";
+    // Uma chave AQ. configurada com a base nativa ainda pertence à superfície
+    // OpenAI-compat do AI Studio. Troca apenas a superfície, não a credencial.
+    const geminiBaseUrl = geminiUsesOpenAICompat && !/\/openai(?:\/v\d+)?$/i.test(requestedGeminiBaseUrl)
+      ? GEMINI_OPENAI_COMPAT_BASE_URL
+      : requestedGeminiBaseUrl;
 
     if (apiKey && geminiUsesOpenAICompat) {
       // Base URL "https://generativelanguage.googleapis.com/v1beta/openai/"

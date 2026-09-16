@@ -8,11 +8,14 @@
  */
 
 import { ANTIGRAVITY_PUBLIC_CONFIG } from "@/config/constants";
-import { extractModelIds, stripTrailingSlashes } from "@/config/providerAliases";
+import {
+  GEMINI_NATIVE_BASE_URL,
+  GEMINI_OPENAI_COMPAT_BASE_URL,
+  extractModelIds,
+  stripTrailingSlashes,
+} from "@/config/providerAliases";
 
-export const GEMINI_NATIVE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-export const GEMINI_OPENAI_COMPAT_BASE_URL =
-  "https://generativelanguage.googleapis.com/v1beta/openai";
+export { GEMINI_NATIVE_BASE_URL, GEMINI_OPENAI_COMPAT_BASE_URL };
 
 /** Resultado padronizado de uma tentativa de descoberta upstream. */
 export interface DiscoveryResult {

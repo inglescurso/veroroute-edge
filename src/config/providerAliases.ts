@@ -6,6 +6,12 @@
  * normalizeProviderId() em vez de repetir comparações hardcoded.
  */
 
+/** Base URL da API nativa do Google AI Studio (Gemini). */
+export const GEMINI_NATIVE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+/** Base URL da camada compatível com OpenAI do Google AI Studio. */
+export const GEMINI_OPENAI_COMPAT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+
 const PROVIDER_ALIASES: Record<string, string> = {
   agy: "antigravity",
   "antigravity-cli": "antigravity",
@@ -36,6 +42,32 @@ export function isOpenAICompatBaseUrl(baseUrl: string): boolean {
   if (url.endsWith("/openai")) return true;
   if (/\/openai\/v\d+$/.test(url)) return true;
   return false;
+}
+
+/**
+ * Prefixos de chave de API do Google AI Studio.
+ *
+ * Verificado contra a API real:
+ *   AIza…  -> aceita pela superfície nativa (?key= / x-goog-api-key) e pela
+ *             camada compatível com OpenAI (Authorization: Bearer).
+ *   AQ.…   -> NÃO é aceita pela superfície nativa (401 "invalid authentication
+ *             credentials"); a camada compatível com OpenAI responde
+ *             "Invalid Auth key" quando a chave é inválida, ou seja, é lá que
+ *             essas chaves são autenticadas.
+ */
+export function isGoogleAiStudioKey(apiKey: string): boolean {
+  return /^AQ\./i.test((apiKey || "").trim());
+}
+
+/**
+ * Decide a superfície de listagem/uso do Gemini a partir da chave + base URL.
+ *   "openai" -> {base}/models com Authorization: Bearer
+ *   "native" -> {base}/models com ?key= / x-goog-api-key
+ */
+export function resolveGeminiSurface(baseUrl: string, apiKey: string): "openai" | "native" {
+  if (isOpenAICompatBaseUrl(baseUrl)) return "openai";
+  if (isGoogleAiStudioKey(apiKey)) return "openai";
+  return "native";
 }
 
 /** Monta a URL de listagem de modelos (/models) a partir de um base URL. */

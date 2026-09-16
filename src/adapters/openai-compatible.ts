@@ -1,4 +1,5 @@
 import { getProviderConfig, PROVIDER_REGISTRY } from "@/config/providers";
+import { GEMINI_OPENAI_COMPAT_BASE_URL, resolveGeminiSurface } from "@/config/providerAliases";
 import { formatGeminiSSEChunkToOpenAI, formatGeminiToOpenAI, formatOpenAIToGemini } from "./gemini";
 import type { ChatCompletionRequest } from "@/types/openai";
 
@@ -21,18 +22,42 @@ export async function executeOpenAICompatible(
   if (providerId === "gemini") {
     const isStream = request.stream ?? false;
     const cleanModel = modelName.replace("gemini/", "");
-    const base = (overrideBaseUrl || provider.baseUrl || "https://generativelanguage.googleapis.com/v1beta").replace(/\/+$/, "");
-    // FIX 1: non-streaming usa ?key=...; streaming usa ?alt=sse&key=...
-    const url = isStream
-      ? `${base}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
-      : `${base}/models/${cleanModel}:generateContent?key=${apiKey}`;
+    const nativeBase = (overrideBaseUrl || provider.baseUrl || "https://generativelanguage.googleapis.com/v1beta").replace(/\/+$/, "");
+
+    // A superfície depende da credencial: chaves "AQ.…" do AI Studio só são
+    // autenticadas na camada compatível com OpenAI (Bearer); chaves "AIza…"
+    // funcionam na API nativa (?key=).
+    const surface = resolveGeminiSurface(nativeBase, apiKey);
+    const useOpenAICompat = surface === "openai";
+    const base = useOpenAICompat ? GEMINI_OPENAI_COMPAT_BASE_URL : nativeBase;
+
+    const url = useOpenAICompat
+      ? `${base}/chat/completions`
+      : isStream
+        ? `${base}/models/${cleanModel}:streamGenerateContent?alt=sse&key=${apiKey}`
+        : `${base}/models/${cleanModel}:generateContent?key=${apiKey}`;
 
     const geminiBody = formatOpenAIToGemini(request);
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
+      headers: useOpenAICompat
+        ? { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }
+        : { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        useOpenAICompat
+          ? {
+              ...request,
+              model: cleanModel,
+              routing_strategy: undefined,
+              output_style: undefined,
+              enable_search: undefined,
+              search_provider: undefined,
+              fallbacks: undefined,
+              compression: undefined,
+            }
+          : geminiBody
+      ),
     });
 
     if (!res.ok) {
@@ -50,9 +75,21 @@ export async function executeOpenAICompatible(
 
     if (!isStream) {
       const geminiJson = await res.json();
-      const openAiJson = formatGeminiToOpenAI(geminiJson, modelName);
+      // A camada OpenAI-compat já devolve o formato OpenAI: passa direto.
+      const openAiJson = useOpenAICompat ? geminiJson : formatGeminiToOpenAI(geminiJson, modelName);
       return new Response(JSON.stringify(openAiJson), {
         headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Streaming da camada OpenAI-compat é SSE no formato OpenAI: passthrough.
+    if (useOpenAICompat) {
+      return new Response(res.body, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
       });
     }
 
