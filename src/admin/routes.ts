@@ -805,9 +805,9 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
 
   const effectiveBaseUrl = body.baseUrl?.trim() || cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined) || prov?.baseUrl;
 
-  const COMBO_TEST_TIMEOUT_MS = 12000;
+  const providerTestTimeoutMs = id === "antigravity" ? 30000 : 12000;
   const results = await Promise.all(
-    targetModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, COMBO_TEST_TIMEOUT_MS, effectiveBaseUrl))
+    targetModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, providerTestTimeoutMs, effectiveBaseUrl))
   );
 
   return c.json({ ok: true, results });
