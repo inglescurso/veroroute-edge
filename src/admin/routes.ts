@@ -263,7 +263,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
   const id = c.req.param("id");
   const body = (await c.req.json().catch(() => ({}))) as { apiKey?: string; baseUrl?: string };
   const cfg = await getAdminConfig(c.env);
-  const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id];
+  const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id] || (id === "agy" ? PROVIDER_REGISTRY["antigravity"] : undefined);
   const preset = FREE_PROVIDER_PRESETS.find((p) => p.id === id);
 
   let apiKey = body.apiKey?.trim() || "";

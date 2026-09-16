@@ -66,6 +66,7 @@ async function isKeyCooledDown(env: EnvBindings, apiKey: string): Promise<boolea
 }
 
 export async function selectActiveCredential(env: EnvBindings, providerId: string): Promise<ProviderCredential> {
+  if (providerId === "agy") providerId = "antigravity";
   const entries = await getProviderCredentials(env, providerId);
   if (entries.length === 0) return { apiKey: "" };
   if (!keyRotationIndex[providerId]) keyRotationIndex[providerId] = 0;
