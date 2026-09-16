@@ -1558,8 +1558,7 @@ dsh --model combo-super-payload
         </p>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.55rem;">
           <a href="${DOCS_SITE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🌐 Site de documentação</a>
-          <a href="${DOCS_SITE_API_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🔌 Endpoints da API</a>
-          <a href="${DOCS_ENDPOINTS_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">📋 Matriz detalhada</a>
+          <a href="${DOCS_FUNCTIONS_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">📖 Funções do sistema</a>
         </div>
       </div>
 
