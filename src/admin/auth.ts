@@ -2,7 +2,11 @@ import type { Context } from "hono";
 import { getAdminConfig } from "./store";
 import type { EnvBindings } from "@/types/provider";
 
-// Auth utilities. AUTH_TOKEN is mandatory — no open/public mode.
+// AUTH_TOKEN is configurable. Fresh installs use this documented fallback.
+// Keeping the fallback here (and not in wrangler.toml) prevents Sync fork
+// builds from overwriting a password set in the Cloudflare Dashboard.
+// ATTENTION: do not add AUTH_TOKEN back to wrangler.toml [vars].
+const DEFAULT_AUTH_TOKEN = "admin";
 
 export type AuthPrincipal =
   | { kind: "master"; id: "master" }
@@ -24,8 +28,7 @@ export async function resolvePrincipal(
   c: AnyCtx,
   token: string
 ): Promise<AuthPrincipal | null> {
-  const master = c.env.AUTH_TOKEN;
-  if (!master) return null;
+  const master = c.env.AUTH_TOKEN?.trim() || DEFAULT_AUTH_TOKEN;
 
   if (token && token === master) {
     return { kind: "master", id: "master" };

@@ -10,6 +10,11 @@ import {
   UPSTREAM_AUTHOR,
   OMNIROUTE_INSPIRATION,
   OMNIROUTE_URL,
+  DOCS_SITE_URL,
+  DOCS_SITE_DEPLOY_URL,
+  DOCS_SITE_API_URL,
+  DOCS_FUNCTIONS_URL,
+  DOCS_ENDPOINTS_URL,
 } from "../config/version";
 
 export function renderDashboardHtml(): string {
@@ -532,6 +537,8 @@ export function renderDashboardHtml(): string {
       <button class="nav-btn" onclick="showTab('combos')">Combos & Quotas</button>
       <button class="nav-btn" onclick="showTab('playground')">Playground</button>
       <button class="nav-btn" onclick="showTab('docs')">Clientes</button>
+      <a class="nav-btn" href="${DOCS_SITE_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">📚 Documentação ↗</a>
+      <a class="nav-btn" href="${DOCS_SITE_API_URL}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🔌 Endpoints ↗</a>
       <button class="nav-btn nav-admin" onclick="showTab('admin')">⚙️ Administração</button>
       <button class="nav-btn" onclick="openAboutModal()" style="border: 1px solid rgba(129,140,248,0.3); color: #c7d2fe;">ℹ️ Sobre & Upstream</button>
       <button id="btn-admin-auth-header" class="nav-btn" style="border: 1px solid rgba(56,189,248,0.3); color: var(--primary);" onclick="openAdminAuthModal()">🔑 Autenticar</button>
@@ -1520,6 +1527,18 @@ dsh --model combo-super-payload
         </p>
       </div>
 
+      <!-- Documentacao Oficial -->
+      <div style="background: rgba(14, 116, 136, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.65rem;">📚 Documentação Oficial</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.55rem;">
+          <a href="${DOCS_SITE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🌐 Abrir documentação</a>
+          <a href="${DOCS_SITE_DEPLOY_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🚀 Guia de implantação</a>
+          <a href="${DOCS_SITE_API_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🔌 Endpoints da API</a>
+          <a href="${DOCS_FUNCTIONS_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">📖 Funções do sistema</a>
+          <a href="${DOCS_ENDPOINTS_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">📋 Matriz detalhada</a>
+        </div>
+      </div>
+
       <!-- Verificador de Atualizações em Tempo Real -->
       <div style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -1528,6 +1547,19 @@ dsh --model combo-super-payload
         </div>
         <div id="modal-update-status" style="font-size: 0.82rem; color: var(--text-muted);">
           Clique em "Verificar Agora" para checar novos commits ou versões no repositório upstream oficial.
+        </div>
+      </div>
+
+      <!-- Documentação e endpoints -->
+      <div style="background: rgba(14, 116, 136, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.5rem;">📚 Documentação Oficial</div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.7rem;">
+          Guias de instalação, arquitetura, provedores e a referência completa dos endpoints ficam no site oficial de documentação.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.55rem;">
+          <a href="${DOCS_SITE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🌐 Site de documentação</a>
+          <a href="${DOCS_SITE_API_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">🔌 Endpoints da API</a>
+          <a href="${DOCS_ENDPOINTS_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="text-decoration:none; text-align:center; font-size:0.8rem;">📋 Matriz detalhada</a>
         </div>
       </div>
 

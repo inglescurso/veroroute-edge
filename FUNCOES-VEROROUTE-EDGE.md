@@ -3,6 +3,8 @@
 **Versão**: 1.0.0  
 **Arquitetura**: Cloudflare Workers (V8 Isolates, Serverless Edge Gateway)  
 **Repositório**: [samucamg/veroroute-edge](https://github.com/samucamg/veroroute-edge)  
+**Documentação Oficial**: [veroroute.24hs.eu.org](https://veroroute.24hs.eu.org/)  
+**Guia de Implantação**: [veroroute.24hs.eu.org/#deploy](https://veroroute.24hs.eu.org/#deploy)  
 **Licença**: MIT  
 
 ---
@@ -176,26 +178,60 @@ O gateway possui uma interface visual integrada acessível diretamente no navega
 
 ## 12. Matriz de Endpoints da API
 
+> Matriz interativa e sempre atualizada: **<https://veroroute.24hs.eu.org/#api>**. Guia de implantação: **<https://veroroute.24hs.eu.org/#deploy>**.
+
 | Endpoint | Método | Autenticação | Descrição |
 |---|---|---|---|
+| `/` | GET | Nenhum | Painel administrativo (SPA embutida) |
 | `/health` | GET | Nenhum | Status e versão do gateway |
-| `/v1/models` | GET | Bearer (`sk-vr-*` ou Master) | Lista de modelos disponíveis |
-| `/v1/chat/completions` | POST | Bearer (`sk-vr-*` ou Master) | Endpoint principal de chat completion |
-| `/v1/messages` | POST | Bearer (`sk-vr-*` ou Master) | Endpoint compatível com Anthropic Claude |
-| `/v1/responses` | POST | Bearer (`sk-vr-*` ou Master) | Adaptador OpenAI Responses |
-| `/api/admin/config` | GET/POST | Bearer Mestre (`AUTH_TOKEN`) | Leitura e atualização da configuração mestre |
-| `/api/admin/keys` | GET/POST/DELETE | Bearer Mestre (`AUTH_TOKEN`) | Gestão de Chaves Virtuais |
-| `/api/admin/combos` | GET/POST/DELETE | Bearer Mestre (`AUTH_TOKEN`) | Gestão de Combos de Roteamento |
-| `/api/admin/circuits` | GET | Bearer Mestre (`AUTH_TOKEN`) | Leitura do estado dos Circuit Breakers |
-| `/api/admin/usage/:keyId` | GET | Bearer Mestre (`AUTH_TOKEN`) | Leitura do consumo e custo de uma chave |
-| `/api/admin/presets` | GET | Bearer Mestre (`AUTH_TOKEN`) | Presets de provedores gratuitos |
-| `/api/admin/providers/:id/keys` | POST/DELETE | Bearer Mestre (`AUTH_TOKEN`) | Adição ao pool e limpeza de chaves de API |
-| `/api/admin/providers/:id/models` | POST/DELETE | Bearer Mestre (`AUTH_TOKEN`) | Adição em lote e remoção de modelos do provedor |
-| `/api/admin/providers/:id/fetch-models` | POST | Bearer Mestre (`AUTH_TOKEN`) | Descoberta dinâmica de modelos via API upstream e catálogo |
-| `/api/oauth/antigravity/*` | GET/POST | Bearer Mestre (`AUTH_TOKEN`) | Fluxo de autenticação OAuth para Google Code Assist |
+| `/v1/models` | GET | Bearer | Lista de modelos, provedores e combos |
+| `/v1/chat/completions` | POST | Bearer | Chat principal, com e sem streaming |
+| `/v1/messages` | POST | Bearer | Compatível com Anthropic Claude |
+| `/v1/responses` | POST | Bearer | Adaptador do formato OpenAI Responses |
+| `/v1/search` | POST | Bearer | Busca web / RAG |
+| `/v1/web/fetch` | POST | Bearer | Extração de conteúdo web |
+| `/v1/images/generations` | POST | Bearer | Geração de imagens |
+| `/v1/images/edits` | POST | Bearer | Edição de imagens |
+| `/v1/audio/speech` | POST | Bearer | Síntese de fala |
+| `/v1/audio/transcriptions` | POST | Bearer | Transcrição de áudio |
+| `/v1/audio/translations` | POST | Bearer | Tradução de áudio |
+| `/api/admin/config` | GET/POST | Bearer Mestre | Leitura e gravação da configuração |
+| `/api/admin/providers` | POST | Bearer Mestre | Criação de provedor customizado |
+| `/api/admin/providers/:id` | DELETE | Bearer Mestre | Remoção de provedor customizado |
+| `/api/admin/providers/:id/toggle` | POST | Bearer Mestre | Habilita/desabilita o provedor |
+| `/api/admin/providers/:id/endpoint` | POST/DELETE | Bearer Mestre | Base URL customizada do provedor |
+| `/api/admin/providers/:id/keys` | POST/DELETE | Bearer Mestre | Pool de chaves e limpeza |
+| `/api/admin/providers/:id/models` | POST/DELETE | Bearer Mestre | Modelos em lote do provedor |
+| `/api/admin/providers/:id/fetch-models` | POST | Bearer Mestre | Descoberta dinâmica no upstream |
+| `/api/admin/providers/:id/test-models` | POST | Bearer Mestre | Teste direto de cada modelo |
+| `/api/admin/models` | GET/POST | Bearer Mestre | Catálogo global e estados |
+| `/api/admin/presets` | GET | Bearer Mestre | Presets de provedores gratuitos |
+| `/api/admin/search` | GET/POST | Bearer Mestre | Configuração do provedor de busca |
+| `/api/admin/search/test` | POST | Bearer Mestre | Teste do provedor de busca |
+| `/api/admin/virtual-keys` | GET/POST | Bearer Mestre | Chaves virtuais `sk-vr-*` |
+| `/api/admin/virtual-keys/:id` | DELETE | Bearer Mestre | Remoção de chave virtual |
+| `/api/admin/combos` | GET/POST | Bearer Mestre | Combos de roteamento |
+| `/api/admin/combos/:id` | DELETE | Bearer Mestre | Remoção de combo |
+| `/api/admin/combos/:id/models` | POST/DELETE | Bearer Mestre | Modelos do combo |
+| `/api/admin/combos/test` | POST | Bearer Mestre | Teste completo do combo |
+| `/api/admin/usage/:keyId` | GET | Bearer Mestre | Consumo e custo por chave |
+| `/api/admin/circuits` | GET | Bearer Mestre | Estado dos circuit breakers |
+| `/api/admin/antigravity/status` | GET | Bearer Mestre | Status da conexão Code Assist |
+| `/api/admin/antigravity/config` | POST | Bearer Mestre | Credenciais OAuth do Code Assist |
+| `/api/oauth/antigravity/authorize` | GET | Bearer Mestre | Início do fluxo OAuth |
+| `/api/oauth/antigravity/callback` | GET | Nenhum | Retorno do Google (redirecionamento) |
+| `/api/oauth/antigravity/import` | POST | Bearer Mestre | Importação manual de tokens |
+| `/api/mcp/sse` | GET | Bearer | Stream SSE do servidor MCP |
+| `/api/mcp/messages` | POST | Bearer | Mensagens MCP |
+
+**Observações**
+
+- Os endpoints `/api/mcp/*` só existem com `ENABLE_MCP_SERVER=true`.
+- O `AUTH_TOKEN` é o token mestre; chaves virtuais `sk-vr-*` acessam apenas `/v1/*`.
+- Em uma instalação nova, o painel inicia com a senha padrão `admin`; troque-a em **Settings → Variables and Secrets**.
+- Após um **Sync fork**, confira essa variável: builds anteriores podiam reaplicar o valor padrão.
 
 ---
-
 ## 13. Guia de Variáveis de Ambiente & Bindings
 
 ### Cloudflare Bindings (wrangler.toml):

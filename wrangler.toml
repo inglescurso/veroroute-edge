@@ -3,14 +3,14 @@ main = "src/index.ts"
 compatibility_date = "2025-02-24"
 compatibility_flags = ["nodejs_compat"]
 
-# Permite manter variaveis e segredos configurados no Cloudflare Dashboard sem que deploys do GitHub os sobrescrevam
+# AUTH_TOKEN is intentionally omitted so Sync fork builds preserve the Dashboard password.
+# Fresh installs use the documented admin fallback until the user changes it.
 keep_vars = true
 
 [ai]
 binding = "AI"
 
 [vars]
-AUTH_TOKEN = "admin"
 SEARXNG_URL = "opcional"
 DEFAULT_ROUTING_STRATEGY = "priority"
 DEFAULT_OUTPUT_STYLE = "none"
@@ -29,11 +29,7 @@ QUOTA_WINDOW_SECONDS = "60"
 [observability]
 enabled = true
 
-# ==============================================================================
-# BINDINGS DE PERSISTENCIA (Cloudflare KV - Automatic Resource Provisioning):
-# Ao omitir o campo "id", o Cloudflare Workers (Wrangler) cria e vincula os KVs
-# automaticamente na conta do usuario durante o deploy (100% zero configuracao manual).
-# ==============================================================================
+# Automatic KV provisioning during the first Cloudflare Git deploy.
 [[kv_namespaces]]
 binding = "OMNI_KEYS"
 

@@ -13,6 +13,7 @@
 [![OpenAI Compatible](https://img.shields.io/badge/OpenAI-compatible-412991?style=for-the-badge&logo=openai&logoColor=white)](#-endpoint-matrix)
 [![Anthropic Compatible](https://img.shields.io/badge/Anthropic-compatible-191919?style=for-the-badge)](#-endpoint-matrix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![Documentation](https://img.shields.io/badge/Docs-veroroute.24hs.eu.org-0e7488?style=for-the-badge)](https://veroroute.24hs.eu.org/)
 
 **[🇺🇸 English](#english) · [🇧🇷 Português](#portugues)**
 
@@ -50,24 +51,33 @@
 
 ## ⚡ Deployment Guide
 
-### 🚀 Recommended: GitHub Fork + Cloudflare Workers (Easiest & Keeps Updated)
+### 🚀 Recommended: Fork on GitHub + Cloudflare Workers (validated in beta)
 
-Because **VeroRoute Edge** is in active beta development with continuous provider additions and fixes, connecting via your GitHub Fork is the best approach. It allows you to update your instance with **one click** without breaking your credentials.
+This is the official, tested path. The fork stays connected to Cloudflare, the KV namespaces are prepared during the build, and future updates are applied with a single **Sync fork** click.
 
-1. **Fork the Repository**:
-   Click the **Fork** button at the top-right of this repository to create your copy on GitHub.
+1. **Fork the repository (web)**:
+   Open the [official repository](https://github.com/samucamg/veroroute-edge) and click **Fork**. Keep the repository name as `veroroute-edge` when possible.
 
-2. **Deploy from Cloudflare Workers**:
-   - In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Continue with GitHub**.
-   - Select your forked `veroroute-edge` repository and click **Deploy**.
-   - ⚡ **Zero Setup Required**: Cloudflare automatically provisions and links your `OMNI_KEYS` and `OMNI_CACHE` KV databases during the build!
+2. **Connect GitHub to Cloudflare**:
+   In the [Cloudflare Dashboard](https://dash.cloudflare.com/) search for **Workers**, open **Workers & Pages → Create application**, choose to connect your GitHub account (or connect another one) and select your `veroroute-edge` fork.
 
-3. **Set Your Master Password (`AUTH_TOKEN`)**:
-   - Once deployed, open your Worker > **Settings** > **Variables and Secrets**.
-   - Click **Add**, set Variable name: `AUTH_TOKEN`, Value: your strong password.
-   - Check **Encrypt (Secret)** and click **Deploy**.
+3. **Change only the project name**:
+   On the next page, change **only the project name** — it becomes your URL `https://your-name.workers.dev`. Leave the build command, branch, directory and every other generated option untouched. Click **Next**, then **Deploy**.
 
-> 💡 **Staying Updated**: When new features or providers are released, open your GitHub fork and click **Sync fork** ➔ **Update branch**. Cloudflare automatically redeploys your Worker in under a minute, keeping all stored credentials and configurations completely safe in KV!
+4. **Wait for the build**:
+   Deployment takes only a few minutes. Wait until it finishes without errors.
+
+5. **Enable the production address (Domains)**:
+   Open **Domains** and use the toggle on the right to enable the production link, then click **Visit**. *Optional:* click **Add domain**, pick a domain from your Cloudflare account, add a subdomain (or leave it empty to use the domain itself), and confirm with **Add domain**.
+
+6. **Choose your password (`AUTH_TOKEN`)**:
+   In **Settings → Variables and Secrets**, set `AUTH_TOKEN` to a strong password and click **Deploy**.
+   ⚡ **Zero KV setup**: Cloudflare provisions and links `OMNI_KEYS` and `OMNI_CACHE` automatically during the build.
+   Fresh installations start with the documented default **`admin`** so you can log in immediately — change it right away.
+
+> ⚠️ **After every Sync fork**: a new build can re-apply the default `admin` value. The variable is no longer shipped in `wrangler.toml`, but if your instance was created before that change, re-check **Settings → Variables and Secrets** after syncing and restore your password when needed.
+
+> 💡 **Staying updated**: open your fork and click **Sync fork ➔ Update branch**. Cloudflare redeploys automatically in about a minute and your provider keys, combos and settings remain stored in KV.
 
 ---
 
@@ -99,11 +109,20 @@ npx wrangler secret put AUTH_TOKEN
 
 ---
 
+## 📚 Official Documentation
+
+- 🌐 **Documentation website**: [https://veroroute.24hs.eu.org/](https://veroroute.24hs.eu.org/) — guides, architecture, providers and the full endpoint reference.
+- 📖 **Functions & features reference**: [FUNCOES-VEROROUTE-EDGE.md](FUNCOES-VEROROUTE-EDGE.md)
+- 🔌 **API endpoint matrix (section 12)**: [FUNCOES-VEROROUTE-EDGE.md#12-matriz-de-endpoints-da-api](FUNCOES-VEROROUTE-EDGE.md#12-matriz-de-endpoints-da-api)
+- 🚀 **Deployment guide**: [https://veroroute.24hs.eu.org/#deploy](https://veroroute.24hs.eu.org/#deploy)
+
+---
+
 ## 🛠️ Configuration & Environment Variables
 
 | Environment Variable | Description | Default | Mandatory |
 |---|---|---|---|
-| `AUTH_TOKEN` | Master bearer token for Admin API & gateway access | — | **Yes** |
+| `AUTH_TOKEN` | Master bearer token for the Admin API and the dashboard. Fresh installs default to `admin` — change it in **Settings → Variables and Secrets** | `admin` | Recommended |
 | `DEFAULT_ROUTING_STRATEGY` | Default strategy (`priority`, `weighted`, `round-robin`, `p2c`, `fill-first`, `least-used`, `cost`, `lkgp`, `session-affinity`) | `priority` | No |
 | `MAX_RETRIES` | Maximum retry attempts per upstream target | `3` | No |
 | `RETRY_DELAY_MS` | Initial delay between retries in milliseconds | `1000` | No |
@@ -120,18 +139,32 @@ npx wrangler secret put AUTH_TOKEN
 
 ## 📌 API Endpoint Matrix
 
-| Endpoint | Method | Auth Required | Description |
+Full and always up-to-date matrix: **[FUNCOES-VEROROUTE-EDGE.md — Section 12](FUNCOES-VEROROUTE-EDGE.md#12-matriz-de-endpoints-da-api)**. Interactive reference: [veroroute.24hs.eu.org/#api](https://veroroute.24hs.eu.org/#api).
+
+| Endpoint | Method | Auth | Description |
 |---|---|---|---|
-| `/health` | GET | No | Gateway health and status check |
-| `/v1/models` | GET | Bearer | OpenAI-compatible model listing |
+| `/health` | GET | None | Gateway health and status check |
+| `/v1/models` | GET | Bearer | OpenAI-compatible model, provider and combo listing |
 | `/v1/chat/completions` | POST | Bearer | OpenAI-compatible chat completion (streaming & non-streaming) |
 | `/v1/messages` | POST | Bearer | Anthropic-compatible messages API |
 | `/v1/responses` | POST | Bearer | OpenAI Response format adapter |
+| `/v1/search` | POST | Bearer | Web search / RAG |
+| `/v1/web/fetch` | POST | Bearer | Web content extraction |
+| `/v1/images/generations`, `/v1/images/edits` | POST | Bearer | Image generation and editing |
+| `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/audio/translations` | POST | Bearer | Speech synthesis, transcription and translation |
 | `/api/admin/config` | GET/POST | Master Bearer | Admin configuration management |
-| `/api/admin/keys` | GET/POST/DELETE | Master Bearer | Virtual API key management |
-| `/api/admin/combos` | GET/POST/DELETE | Master Bearer | Custom combo route definitions |
-| `/api/admin/circuits` | GET | Master Bearer | Upstream provider circuit breaker states |
-| `/api/admin/usage/:keyId` | GET | Master Bearer | Daily and monthly usage & estimated cost metrics |
+| `/api/admin/providers/:id/*` | POST/DELETE | Master Bearer | Provider toggle, endpoint, keys and models |
+| `/api/admin/providers/:id/fetch-models` | POST | Master Bearer | Dynamic upstream model discovery |
+| `/api/admin/providers/:id/test-models` | POST | Master Bearer | Direct per-model connectivity test |
+| `/api/admin/models` | GET/POST | Master Bearer | Global model catalog and per-model state |
+| `/api/admin/virtual-keys` | GET/POST/DELETE | Master Bearer | Virtual API key management |
+| `/api/admin/combos` | GET/POST/DELETE | Master Bearer | Custom combo routes and combo testing |
+| `/api/admin/presets` | GET | Master Bearer | Free provider presets |
+| `/api/admin/search` | GET/POST | Master Bearer | Web search provider configuration and testing |
+| `/api/admin/usage/:keyId` | GET | Master Bearer | Daily/monthly usage and estimated cost |
+| `/api/admin/circuits` | GET | Master Bearer | Circuit breaker states |
+| `/api/oauth/antigravity/*` | GET/POST | Master Bearer* | Google Code Assist OAuth and token import (*`/callback` is a Google redirect) |
+| `/api/mcp/*` | GET/POST | Bearer | MCP server when `ENABLE_MCP_SERVER=true` |
 
 ---
 
@@ -152,7 +185,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 ## ✨ Visão Geral & Agradecimentos
 
-O **VeroRoute Edge** é um gateway de IA serverless e roteador inteligente projetado especificamente para o **Cloudflare Workers (V8 Isolates)**.
+O **VeroRoute Edge** é um gateway de IA serverless e roteador inteligente projetado especificamente para o **Cloudflare Workers (V8 Isolates)**. Documentação completa: [veroroute.24hs.eu.org](https://veroroute.24hs.eu.org/).
 
 > 💡 **Inspiração e Origem**  
 > Este projeto foi diretamente inspirado no excelente projeto [**OmniRoute**](https://github.com/diegosouzapw/OmniRoute) criado por [@diegosouzapw](https://github.com/diegosouzapw).
@@ -177,24 +210,33 @@ O **VeroRoute Edge** é um gateway de IA serverless e roteador inteligente proje
 
 ## ⚡ Guia de Implantação
 
-### 🚀 Método Recomendado: Fork no GitHub + Cloudflare Workers (Mais Fácil e com Atualizações)
+### 🚀 Método Recomendado: Fork no GitHub + Cloudflare Workers (validado na fase beta)
 
-Como o **VeroRoute Edge** está em desenvolvimento beta ativo com constantes novos provedores e correções, conectar via Fork do seu GitHub é o método mais recomendado. Ele permite que qualquer usuário atualize sua instância com **1 clique** sem perder chaves nem configurações.
+Este é o caminho oficial e testado. O fork permanece conectado à Cloudflare, os bancos KV são preparados durante o build e as próximas atualizações são aplicadas com um único clique em **Sync fork**.
 
-1. **Faça o Fork do Repositório**:
-   Clique no botão **Fork** no canto superior direito deste repositório para criar sua cópia pessoal no GitHub.
+1. **Faça o Fork do repositório (pela web)**:
+   Abra o [repositório oficial](https://github.com/samucamg/veroroute-edge) e clique em **Fork**. Mantenha o nome do repositório como `veroroute-edge`, se possível.
 
-2. **Faça o Deploy Conectando o GitHub na Cloudflare**:
-   - No [Painel da Cloudflare](https://dash.cloudflare.com/), acesse **Workers & Pages** > **Create application** > **Continue with GitHub**.
-   - Selecione o seu repositório `veroroute-edge` e clique em **Deploy**.
-   - ⚡ **Zero Configuração Manual de KV**: O Cloudflare Workers cria e vincula automaticamente os bancos `OMNI_KEYS` e `OMNI_CACHE` na sua conta durante a compilação!
+2. **Conecte o GitHub à sua conta Cloudflare**:
+   No [Painel da Cloudflare](https://dash.cloudflare.com/), digite **Workers** na busca, abra **Workers & Pages → Create application**, escolha conectar sua conta do GitHub (ou conecte outra) e selecione o fork `veroroute-edge`.
 
-3. **Defina a Senha Mestra Segura (`AUTH_TOKEN`)**:
-   - No seu Worker recém-criado, acesse **Settings** > **Variables and Secrets**.
-   - Clique em **Add**, defina o nome como `AUTH_TOKEN`, digite sua senha forte e marque **Encrypt (Secret)**.
-   - Clique em **Deploy**.
+3. **Altere somente o nome do projeto**:
+   Na tela seguinte, altere **apenas o nome do projeto** — ele será usado na URL `https://nome-do-projeto.workers.dev`. Não altere o comando de build, a branch, o diretório nem qualquer outra opção já preenchida pelo repositório. Clique em **Next** e depois em **Deploy**.
 
-> 💡 **Como Atualizar Sua Instância**: Quando uma nova versão for lançada no repositório oficial, abra o seu Fork no GitHub e clique em **Sync fork** ➔ **Update branch**. A Cloudflare detectará a mudança e atualizará seu Worker em menos de 1 minuto, preservando 100% das suas chaves e configurações no KV!
+4. **Aguarde a conclusão do deploy**:
+   A publicação leva poucos minutos. Aguarde terminar sem erros antes de abrir o Worker.
+
+5. **Habilite o endereço de produção (Domains)**:
+   Abra **Domains** e clique no botão à direita para habilitar o link em produção; use **Visit** para acessar. *Opcional:* clique em **Add domain**, escolha um domínio da sua conta Cloudflare, informe um subdomínio (ou deixe vazio para usar o próprio domínio) e confirme em **Add domain**.
+
+6. **Escolha sua senha (`AUTH_TOKEN`)**:
+   Em **Settings → Variables and Secrets**, defina `AUTH_TOKEN` com uma senha forte e clique em **Deploy**.
+   ⚡ **Zero configuração de KV**: a Cloudflare cria e vincula `OMNI_KEYS` e `OMNI_CACHE` automaticamente durante o build.
+   A instalação nova inicia com a senha padrão documentada **`admin`**, permitindo o primeiro acesso imediato — troque-a logo depois.
+
+> ⚠️ **Depois de cada Sync fork**: um novo build pode reaplicar o valor padrão `admin`. A variável não é mais enviada pelo `wrangler.toml`, mas se a sua instância foi criada antes dessa mudança, confira **Settings → Variables and Secrets** após sincronizar e restaure sua senha quando necessário.
+
+> 💡 **Como manter atualizado**: abra o seu fork e clique em **Sync fork ➔ Update branch**. A Cloudflare refaz o deploy automaticamente em cerca de um minuto e suas chaves de provedores, combos e configurações continuam guardados no KV.
 
 ---
 
@@ -222,6 +264,15 @@ npx wrangler deploy
 # 6. Definir a chave mestre AUTH_TOKEN
 npx wrangler secret put AUTH_TOKEN
 ```
+
+---
+
+## 📚 Documentação Oficial
+
+- 🌐 **Site de documentação**: [https://veroroute.24hs.eu.org/](https://veroroute.24hs.eu.org/) — guias, arquitetura, provedores e referência completa dos endpoints.
+- 📖 **Funções e recursos**: [FUNCOES-VEROROUTE-EDGE.md](FUNCOES-VEROROUTE-EDGE.md)
+- 🔌 **Matriz de Endpoints da API (seção 12)**: [FUNCOES-VEROROUTE-EDGE.md#12-matriz-de-endpoints-da-api](FUNCOES-VEROROUTE-EDGE.md#12-matriz-de-endpoints-da-api)
+- 🚀 **Guia de implantação**: [https://veroroute.24hs.eu.org/#deploy](https://veroroute.24hs.eu.org/#deploy)
 
 ---
 
