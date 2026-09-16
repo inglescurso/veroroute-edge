@@ -142,17 +142,9 @@ export function normalizeAntigravityModel(modelName: string): string {
     .replace(/^antigravity\//, "")
     .trim();
 
-  const legacyAliases: Record<string, string> = {
-    "claude-3-7-sonnet": "claude-sonnet-4-6",
-    "claude-3.7-sonnet": "claude-sonnet-4-6",
-    "claude-3-5-sonnet": "claude-sonnet-4-6",
-    "claude-sonnet-4-5": "claude-sonnet-4-6",
-    "gemini-2.0-flash": "gemini-3-flash",
-    "gemini-2.5-flash": "gemini-3.5-flash-lite",
-    "gemini-2.5-pro": "gemini-3.1-pro-high",
-    "code-bison": "gemini-3.1-flash-lite",
-    "chat-bison": "gemini-3.1-flash-lite",
-  };
-
-  return legacyAliases[clean] || clean;
+  // Sem tabela de aliases "adivinhados": o catálogo real é descoberto em
+  // /v1internal:fetchAvailableModels e modelos como gemini-2.5-pro,
+  // gemini-2.5-flash e claude-3-7-sonnet continuam válidos upstream — traduzir
+  // esses ids para outro modelo trocaria silenciosamente o que o usuário pediu.
+  return clean;
 }

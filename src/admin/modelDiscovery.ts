@@ -45,6 +45,9 @@ function orderAntigravityModels(ids: string[], payload: any): string[] {
   const push = (id: unknown) => {
     if (typeof id !== "string") return;
     const clean = id.replace(/^models\//, "");
+    // tab_*/chat_* são modelos internos (Tab completion / agrupamentos do
+    // editor) que não respondem em /v1internal:generateContent.
+    if (/^(tab_|chat_)/i.test(clean)) return;
     if (available.has(clean) && !ordered.includes(clean)) ordered.push(clean);
   };
 
