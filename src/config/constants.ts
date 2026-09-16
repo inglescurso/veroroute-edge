@@ -33,8 +33,11 @@ export const ANTIGRAVITY_PUBLIC_CONFIG = {
   streamGenerateContentPath: "/v1internal:streamGenerateContent?alt=sse",
   userAgent:
     "antigravity/cli/1.1.26 (aidev_client; os_type=linux; arch=amd64; cl=976013059; auth_method=consumer)",
-  /** Projeto "companion" do Cloud Code Assist quando o onboarding não devolve um id. */
-  defaultProjectId: "",
+  /**
+   * Projeto consumer usado pelo CLI oficial e pelo Account Switcher quando o
+   * onboarding não devolve um companion project (não é um id secreto/da conta).
+   */
+  defaultProjectId: "aicode-consumers",
 };
 
 // Claude Code CLI OAuth

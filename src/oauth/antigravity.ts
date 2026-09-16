@@ -197,17 +197,22 @@ export async function getValidAntigravityAccessToken(
 
   // Fallback para as variáveis de ambiente clássicas
   if (!credential.apiKey && env.ANTIGRAVITY_ACCESS_TOKEN) {
-    return { accessToken: env.ANTIGRAVITY_ACCESS_TOKEN, projectId: env.ANTIGRAVITY_PROJECT_ID || "" };
+    return {
+      accessToken: env.ANTIGRAVITY_ACCESS_TOKEN,
+      projectId: env.ANTIGRAVITY_PROJECT_ID || ANTIGRAVITY_PUBLIC_CONFIG.defaultProjectId,
+    };
   }
 
   let refreshToken = env.ANTIGRAVITY_REFRESH_TOKEN || "";
-  let projectId = env.ANTIGRAVITY_PROJECT_ID || "";
+  // O cache do access token pode sobreviver a uma credencial antiga sem
+  // project_id. Nunca devolva projeto vazio: o CLI usa "aicode-consumers".
+  let projectId = env.ANTIGRAVITY_PROJECT_ID || ANTIGRAVITY_PUBLIC_CONFIG.defaultProjectId;
 
   if (credential.apiKey) {
     try {
       const parsed = JSON.parse(credential.apiKey);
       refreshToken = parsed.refresh_token || parsed.token || "";
-      projectId = parsed.project_id || "";
+      projectId = parsed.project_id || projectId;
     } catch {
       refreshToken = credential.apiKey;
     }
