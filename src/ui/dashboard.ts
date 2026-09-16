@@ -1419,6 +1419,39 @@ dsh --model combo-super-payload
     </div>
   </div>
 
+  <!-- MODAL: CHAVE VIRTUAL GERADA (COPIÁVEL COM 1 CLIQUE) -->
+  <div id="modal-key-success" class="modal-overlay">
+    <div class="modal-card" style="max-width: 540px; width: 95%;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+          🔑 Chave Virtual Criada com Sucesso
+        </h3>
+        <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.85rem;" onclick="closeKeySuccessModal()">✕</button>
+      </div>
+
+      <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">
+        Sua chave de acesso foi gerada. Copie-a abaixo e configure no seu <strong>Cursor, Cline, Claude Code, LibreChat</strong> ou cliente OpenAI:
+      </p>
+
+      <!-- Input com botão de cópia 1-clique e seleção facilitada -->
+      <div style="background: rgba(0, 0, 0, 0.45); border: 1px solid var(--primary); border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.6rem;">
+        <input type="text" id="mks-key-input" readonly onclick="this.select()" style="font-family: monospace; font-size: 0.92rem; width: 100%; background: transparent; border: none; color: var(--primary); outline: none; cursor: text;" />
+        <button type="button" id="mks-copy-btn" class="btn" style="padding: 0.45rem 1rem; font-size: 0.82rem; white-space: nowrap; flex-shrink: 0;" onclick="copyKeySuccessValue()">
+          📋 Copiar
+        </button>
+      </div>
+
+      <div style="background: rgba(56, 189, 248, 0.04); border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 8px; padding: 0.85rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
+        <div><strong>Base URL (OpenAI API):</strong> <code id="mks-baseurl" style="color: var(--primary); font-family: monospace;"></code></div>
+        <div style="margin-top: 0.4rem;"><strong>Modelos / Combos:</strong> Utilize o nome de qualquer combo (ex: <code>baratos</code>, <code>omni-free</code>, <code>omni-code</code>) no campo <code>model</code> do seu cliente.</div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" style="padding: 0.45rem 1.2rem; font-size: 0.85rem;" onclick="closeKeySuccessModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: SOBRE, UPSTREAM & GUIA DE ATUALIZAÇÃO -->
   <div id="modal-about" class="modal-overlay">
     <div class="modal-card" style="max-width: 680px;">
@@ -2672,13 +2705,19 @@ git push origin master
         }
         data.keys.forEach(function(k) {
           const item = document.createElement('div');
-          item.style = 'display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.8rem; background:rgba(255,255,255,0.03); border:1px solid var(--card-border); border-radius:8px;';
+          item.style = 'display:flex; justify-content:space-between; align-items:center; padding:0.65rem 0.85rem; background:rgba(255,255,255,0.03); border:1px solid var(--card-border); border-radius:8px; gap:0.5rem; flex-wrap:wrap;';
           item.innerHTML =
             '<div>' +
-              '<div style="font-weight:600; font-size:0.85rem;">' + escapeHtml(k.name) + ' <span style="font-family:monospace; color:var(--primary); font-size:0.8rem; margin-left:0.5rem;">' + escapeHtml(k.key) + '</span></div>' +
-              '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">Requisições: <strong>' + (k.requestsCount || 0) + '</strong> · Criada em: ' + escapeHtml(k.createdAt ? k.createdAt.substring(0, 10) : '') + '</div>' +
+              '<div style="font-weight:600; font-size:0.85rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">' +
+                '<span>' + escapeHtml(k.name) + '</span>' +
+                '<span style="font-family:monospace; color:var(--primary); font-size:0.8rem; background:rgba(56,189,248,0.1); padding:0.15rem 0.45rem; border-radius:4px; cursor:pointer;" title="Clique para copiar" onclick="navigator.clipboard.writeText(&apos;' + escapeHtml(k.key || k.id) + '&apos;); showToast(&apos;Chave copiada!&apos;, &apos;success&apos;);">' + escapeHtml(k.key || k.id) + ' 📋</span>' +
+              '</div>' +
+              '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem;">Requisições: <strong>' + (k.totalRequests || k.requestsCount || 0) + '</strong> · Criada em: ' + escapeHtml(k.createdAt ? k.createdAt.substring(0, 10) : '') + '</div>' +
             '</div>' +
-            '<button class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(244,63,94,0.15); color:var(--rose);" onclick="deleteVirtualKey(&apos;' + escapeHtml(k.id) + '&apos;)">Revogar</button>';
+            '<div style="display:flex; gap:0.4rem;">' +
+              '<button type="button" class="btn btn-secondary" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="navigator.clipboard.writeText(&apos;' + escapeHtml(k.key || k.id) + '&apos;); showToast(&apos;Chave copiada com sucesso!&apos;, &apos;success&apos;);">📋 Copiar</button>' +
+              '<button type="button" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(244,63,94,0.15); color:var(--rose);" onclick="deleteVirtualKey(&apos;' + escapeHtml(k.id) + '&apos;)">Revogar</button>' +
+            '</div>';
           list.appendChild(item);
         });
       } catch (e) {
@@ -2686,9 +2725,51 @@ git push origin master
       }
     }
 
+    function showKeySuccessModal(keyVal) {
+      const modal = document.getElementById('modal-key-success');
+      const input = document.getElementById('mks-key-input');
+      const baseEl = document.getElementById('mks-baseurl');
+      if (input) input.value = keyVal;
+      if (baseEl) baseEl.innerText = window.location.origin + '/v1';
+      if (modal) modal.classList.add('active');
+      setTimeout(function() {
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 150);
+    }
+
+    function closeKeySuccessModal() {
+      const modal = document.getElementById('modal-key-success');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function copyKeySuccessValue() {
+      const input = document.getElementById('mks-key-input');
+      const btn = document.getElementById('mks-copy-btn');
+      if (!input || !input.value) return;
+      try {
+        await navigator.clipboard.writeText(input.value);
+        if (btn) {
+          btn.innerText = '✓ Copiado!';
+          btn.style.background = 'var(--emerald)';
+          setTimeout(function() {
+            btn.innerText = '📋 Copiar';
+            btn.style.background = '';
+          }, 2000);
+        }
+        showToast('Chave copiada para a área de transferência!', 'success');
+      } catch (e) {
+        input.select();
+        document.execCommand('copy');
+        showToast('Chave copiada!', 'success');
+      }
+    }
+
     async function createVirtualKey() {
       const name = document.getElementById('adm-vkey-name').value.trim();
-      if (!name) return alert('Informe o nome do cliente ou IDE');
+      if (!name) return showToast('Informe o nome do cliente ou IDE', 'error');
       try {
         const res = await adminFetch('/api/admin/virtual-keys', {
           method: 'POST',
@@ -2699,12 +2780,13 @@ git push origin master
         if (data.ok && data.key) {
           document.getElementById('adm-vkey-name').value = '';
           loadVirtualKeys();
-          alert('Chave virtual criada com sucesso!\\n\\nChave: ' + data.key.key + '\\n\\nCopie e configure no seu Cursor/Cline/Claude Code.');
+          showKeySuccessModal(data.key.key || data.key.id);
+          showToast('Chave virtual criada com sucesso!', 'success');
         } else {
-          alert('Erro ao criar chave: ' + JSON.stringify(data));
+          showToast('Erro ao criar chave: ' + JSON.stringify(data.error || data), 'error');
         }
       } catch (e) {
-        alert('Erro: ' + e.message);
+        showToast('Erro: ' + e.message, 'error');
       }
     }
 
@@ -2714,12 +2796,13 @@ git push origin master
         const res = await adminFetch('/api/admin/virtual-keys/' + id, { method: 'DELETE' });
         const data = await res.json();
         if (data.ok) {
+          showToast('Chave virtual revogada com sucesso.', 'info');
           loadVirtualKeys();
         } else {
-          alert('Erro ao revogar chave: ' + JSON.stringify(data));
+          showToast('Erro ao revogar chave: ' + JSON.stringify(data.error || data), 'error');
         }
       } catch (e) {
-        alert('Erro: ' + e.message);
+        showToast('Erro: ' + e.message, 'error');
       }
     }
 
@@ -2803,7 +2886,7 @@ git push origin master
             '<div>' +
               '<div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">' +
                 '<span style="font-size:1.1rem; font-weight:700; color:#fff;">' + escapeHtml(c.name || c.id) + '</span>' +
-                '<span class="badge-edge" style="font-family:monospace; background:rgba(56,189,248,0.15); color:var(--primary); cursor:pointer;" title="Clique para copiar" data-copy="' + escapeHtml(c.id) + '" onclick="navigator.clipboard.writeText(this.dataset.copy); alert(this.dataset.copy + String.fromCharCode(32,99,111,112,105,97,100,111));">' +
+                '<span class="badge-edge" style="font-family:monospace; background:rgba(56,189,248,0.15); color:var(--primary); cursor:pointer;" title="Clique para copiar" data-copy="' + escapeHtml(c.id) + '" onclick="navigator.clipboard.writeText(this.dataset.copy); showToast(&apos;Copiado: &apos; + this.dataset.copy, &apos;success&apos;);">' +
                   'model: ' + escapeHtml(c.id) + ' 📋' +
                 '</span>' +
                 '<span class="badge-edge" style="background:rgba(129,140,248,0.15); color:var(--accent); border-color:rgba(129,140,248,0.3);">' +
