@@ -19,6 +19,13 @@ export async function executeAntigravityRequest(
   const geminiPayload = formatOpenAIToGemini(request);
   const upstreamModel = normalizeAntigravityModel(modelName);
 
+  // Defaults usados pelo executor do OmniRouter/IDE. Alguns modelos Gemini 3.x
+  // rejeitam topP=0.95 sem topK; o cliente oficial usa topK=40 e topP=1.0.
+  const generationConfig = (geminiPayload.generationConfig || {}) as Record<string, unknown>;
+  if (generationConfig.topK === undefined) generationConfig.topK = 40;
+  if (generationConfig.topP === undefined || generationConfig.topP === 0.95) generationConfig.topP = 1.0;
+  geminiPayload.generationConfig = generationConfig;
+
   const isStream = request.stream ?? false;
   const endpoint = isStream
     ? ANTIGRAVITY_PUBLIC_CONFIG.runtimeBaseUrl + ANTIGRAVITY_PUBLIC_CONFIG.streamGenerateContentPath
