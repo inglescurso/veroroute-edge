@@ -296,7 +296,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       "@cf/baai/bge-large-en-v1.5",
       "@cf/baai/bge-small-en-v1.5",
     ];
-  } else if (id === "antigravity") {
+  } else if (id === "antigravity" || id === "agy") {
     const antigravityCatalog = [
       "gemini-2.5-pro",
       "gemini-2.5-flash",
@@ -531,8 +531,8 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         let cleanedUrl = baseUrl.replace(/\/+$/, "");
         if (cleanedUrl.endsWith("/models")) {
           url = cleanedUrl;
-        } else if (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1")) {
-          if (!cleanedUrl.endsWith("/v1")) cleanedUrl += "/v1";
+        } else if (prov?.protocol === "openai" || id === "cheaperinference" || cleanedUrl.endsWith("/v1") || cleanedUrl.endsWith("/openai")) {
+          if (!cleanedUrl.endsWith("/v1") && !cleanedUrl.endsWith("/openai")) cleanedUrl += "/v1";
           url = cleanedUrl + "/models";
         } else {
           url = cleanedUrl + "/models";
@@ -631,7 +631,7 @@ export async function executeDirectProviderTest(
         };
       }
       resPromise = executeCloudflareAI(testReq, env.AI, model);
-    } else if (providerId === "antigravity") {
+    } else if (providerId === "antigravity" || providerId === "agy") {
       const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
       const { executeAntigravityRequest } = await import("@/adapters/antigravity");
       const antigravResult = await getValidAntigravityAccessToken(env);
@@ -739,7 +739,7 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
   if (!apiKey) {
     apiKey = (await selectActiveCredential(c.env, id)).apiKey;
   }
-  if (!apiKey && id !== "cloudflare-ai" && id !== "antigravity" && id !== "pollinations" && id !== "freeapikey") {
+  if (!apiKey && id !== "cloudflare-ai" && id !== "antigravity" && id !== "agy" && id !== "pollinations" && id !== "freeapikey") {
     return c.json({ error: { message: "Sem chave de API configurada para testar este provedor", type: "auth" } }, 401);
   }
 
