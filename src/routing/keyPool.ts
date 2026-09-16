@@ -1,6 +1,7 @@
 import type { EnvBindings } from "@/types/provider";
 import { getStoredProviderCredentials } from "@/admin/store";
 import type { ProviderCredential } from "@/admin/store";
+import { normalizeProviderId } from "@/config/providerAliases";
 
 const keyRotationIndex: Record<string, number> = {};
 const keyCooldowns: Map<string, number> = new Map();
@@ -66,7 +67,7 @@ async function isKeyCooledDown(env: EnvBindings, apiKey: string): Promise<boolea
 }
 
 export async function selectActiveCredential(env: EnvBindings, providerId: string): Promise<ProviderCredential> {
-  if (providerId === "agy") providerId = "antigravity";
+  providerId = normalizeProviderId(providerId);
   const entries = await getProviderCredentials(env, providerId);
   if (entries.length === 0) return { apiKey: "" };
   if (!keyRotationIndex[providerId]) keyRotationIndex[providerId] = 0;

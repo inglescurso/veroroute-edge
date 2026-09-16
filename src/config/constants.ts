@@ -25,7 +25,16 @@ export const ANTIGRAVITY_PUBLIC_CONFIG = {
   runtimeBaseUrl: "https://cloudcode-pa.googleapis.com",
   loadCodeAssistPath: "/v1internal:loadCodeAssist",
   onboardUserPath: "/v1internal:onboardUser",
-  modelsDiscoveryPath: "/v1internal:models",
+  // RPC oficial de descoberta de modelos do Cloud Code Assist.
+  // NÃO existe rota REST "/v1internal:models": o RPC correto é um POST em
+  // /v1internal:fetchAvailableModels (host "daily" é o usado pelo CLI/IDE).
+  fetchAvailableModelsPath: "/v1internal:fetchAvailableModels",
+  generateContentPath: "/v1internal:generateContent",
+  streamGenerateContentPath: "/v1internal:streamGenerateContent?alt=sse",
+  userAgent:
+    "antigravity/cli/1.1.26 (aidev_client; os_type=linux; arch=amd64; cl=976013059; auth_method=consumer)",
+  /** Projeto "companion" do Cloud Code Assist quando o onboarding não devolve um id. */
+  defaultProjectId: "",
 };
 
 // Claude Code CLI OAuth

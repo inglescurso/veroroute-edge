@@ -7,6 +7,7 @@ import { getValidAntigravityAccessToken } from "@/oauth/antigravity";
 import { markKeyRateLimited, selectActiveCredential } from "./keyPool";
 import { getAdminConfig } from "@/admin/store";
 import { getProviderConfig, registerCustomProvider } from "@/config/providers";
+import { normalizeProviderId } from "@/config/providerAliases";
 import { applyRoutingStrategy, recordCandidateSuccess, type TargetCandidate } from "./strategies";
 import { injectToolCallingPrompt, postProcessEmulatedResponse, completionToSSE } from "@/adapters/toolEmulation";
 import { withDeadline, UpstreamTimeout, boundedInt } from "./resilience";
@@ -42,10 +43,13 @@ export function resolveCandidates(
     };
   }
 
-  for (const prefix of ["antigravity", "1min", "cloudflare-ai", "cerebras", "groq", "gemini", "azure", "bedrock"]) {
+  // "agy" é aceito como alias de borda de "antigravity" (normalizado aqui, em um único ponto).
+  for (const prefix of ["antigravity", "agy", "1min", "cloudflare-ai", "cerebras", "groq", "gemini", "azure", "bedrock"]) {
     if (model.startsWith(prefix + "/") || (prefix === "cloudflare-ai" && model.startsWith("@cf/"))) {
+      const provider = normalizeProviderId(prefix);
+      const normalizedModel = provider === prefix ? model : provider + model.slice(prefix.length);
       return {
-        candidates: [{ provider: prefix, model, weight: 1, priority: 1, cost: 0 }],
+        candidates: [{ provider, model: normalizedModel, weight: 1, priority: 1, cost: 0 }],
       };
     }
   }

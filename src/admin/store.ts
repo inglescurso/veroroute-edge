@@ -1,5 +1,6 @@
 import type { EnvBindings } from "@/types/provider";
 import { ANTIGRAVITY_PUBLIC_CONFIG } from "@/config/constants";
+import { normalizeProviderId } from "@/config/providerAliases";
 export interface ProviderCredential {
   apiKey: string;
 }
@@ -322,7 +323,7 @@ export function slugifyProviderId(name: string): string {
 const inMemoryCredentials: Record<string, ProviderCredential[]> = {};
 
 export async function getStoredProviderCredentials(env: EnvBindings, providerId: string): Promise<ProviderCredential[]> {
-  if (providerId === "agy") providerId = "antigravity";
+  providerId = normalizeProviderId(providerId);
   const kv = env.OMNI_KEYS;
   if (!kv) return inMemoryCredentials[providerId] || [];
   const raw = await kv.get("credentials_" + providerId);
@@ -345,7 +346,7 @@ export async function setStoredProviderCredentials(
   providerId: string,
   credentials: ProviderCredential[]
 ): Promise<void> {
-  if (providerId === "agy") providerId = "antigravity";
+  providerId = normalizeProviderId(providerId);
   const kv = env.OMNI_KEYS;
   const clean = credentials
     .map((item) => ({ apiKey: item.apiKey.trim() }))
@@ -379,7 +380,7 @@ export async function appendProviderCredentials(
   providerId: string,
   newCredentials: ProviderCredential[]
 ): Promise<ProviderCredential[]> {
-  if (providerId === "agy") providerId = "antigravity";
+  providerId = normalizeProviderId(providerId);
   const existing = await getStoredProviderCredentials(env, providerId);
   const merged = Array.from(new Map([...existing, ...newCredentials]
     .map((item) => ({ apiKey: item.apiKey.trim() }))
@@ -394,7 +395,7 @@ export async function appendProviderKeys(env: EnvBindings, providerId: string, n
 }
 
 export async function removeProviderKeys(env: EnvBindings, providerId: string, keysToRemove: string[]): Promise<string[]> {
-  if (providerId === "agy") providerId = "antigravity";
+  providerId = normalizeProviderId(providerId);
   const removeSet = new Set(keysToRemove.map((key) => key.trim()));
   const remaining = (await getStoredProviderCredentials(env, providerId)).filter((item) => !removeSet.has(item.apiKey));
   await setStoredProviderCredentials(env, providerId, remaining);

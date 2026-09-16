@@ -3,7 +3,12 @@ import { formatGeminiSSEChunkToOpenAI, formatGeminiToOpenAI, formatOpenAIToGemin
 import type { ChatCompletionRequest, ChatCompletionResponse } from "@/types/openai";
 
 /**
- * Executa requisição para a API Upstream do Antigravity (Google Cloud Code Assist)
+ * Executa requisição para a API Upstream do Antigravity (Google Cloud Code Assist).
+ *
+ * Envelope oficial do Cloud Code Assist (v1internal):
+ *   POST {runtimeBaseUrl}/v1internal:generateContent
+ *   body: { "model": "...", "project": "...", "request": { <GenerateContentRequest> } }
+ *   resposta: { "response": { "candidates": [...], "usageMetadata": {...} } }
  */
 export async function executeAntigravityRequest(
   request: ChatCompletionRequest,
@@ -12,46 +17,29 @@ export async function executeAntigravityRequest(
   modelName: string
 ): Promise<Response> {
   const geminiPayload = formatOpenAIToGemini(request);
-
-  // Normaliza nome do modelo para o Code Assist
-  const cleanModel = modelName.replace("antigravity/", "");
-  let upstreamModel = cleanModel;
-  if (cleanModel === "claude-3-7-sonnet" || cleanModel.includes("claude-3-7")) {
-    upstreamModel = "claude-3-7-sonnet";
-  } else if (cleanModel.includes("claude-3-5")) {
-    upstreamModel = "claude-3-5-sonnet";
-  } else if (cleanModel === "gemini-2.5-flash" || cleanModel.includes("2.5-flash")) {
-    upstreamModel = "gemini-2.5-flash";
-  } else if (cleanModel === "gemini-2.0-flash" || cleanModel.includes("2.0-flash")) {
-    upstreamModel = "gemini-2.0-flash";
-  } else if (cleanModel === "gemini-1.5-flash" || cleanModel.includes("1.5-flash")) {
-    upstreamModel = "gemini-1.5-flash";
-  } else if (cleanModel === "gemini-1.5-pro" || cleanModel.includes("1.5-pro")) {
-    upstreamModel = "gemini-1.5-pro";
-  } else if (cleanModel === "gemini-2.5-pro" || cleanModel.includes("2.5-pro")) {
-    upstreamModel = "gemini-2.5-pro";
-  }
+  const upstreamModel = normalizeAntigravityModel(modelName);
 
   const isStream = request.stream ?? false;
   const endpoint = isStream
-    ? `${ANTIGRAVITY_PUBLIC_CONFIG.runtimeBaseUrl}/v1internal:streamGenerateCode?alt=sse`
-    : `${ANTIGRAVITY_PUBLIC_CONFIG.runtimeBaseUrl}/v1internal:generateCode`;
+    ? ANTIGRAVITY_PUBLIC_CONFIG.runtimeBaseUrl + ANTIGRAVITY_PUBLIC_CONFIG.streamGenerateContentPath
+    : ANTIGRAVITY_PUBLIC_CONFIG.runtimeBaseUrl + ANTIGRAVITY_PUBLIC_CONFIG.generateContentPath;
 
-  const envelope = {
+  const envelope: Record<string, unknown> = {
     model: upstreamModel,
-    project: projectId || undefined,
-    userPrompt: {
+    // O Code Assist só aceita o campo "request" com o GenerateContentRequest dentro.
+    request: {
       ...geminiPayload,
     },
   };
+  if (projectId) envelope.project = projectId;
 
   const upstreamRes = await fetch(endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "User-Agent": "Antigravity-CLI/2.5.0",
-      "X-Goog-Api-Client": "gl-node/20.20.2 antigravity/2.5.0",
+      Accept: isStream ? "text/event-stream" : "application/json",
+      "User-Agent": ANTIGRAVITY_PUBLIC_CONFIG.userAgent,
     },
     body: JSON.stringify(envelope),
   });
@@ -72,7 +60,7 @@ export async function executeAntigravityRequest(
 
   if (!isStream) {
     const rawData = (await upstreamRes.json()) as any;
-    // O envelope do Code Assist pode encapsular dentro de response ou direto
+    // O envelope do Code Assist pode encapsular dentro de response ou vir direto
     const contentData = rawData.response || rawData;
     const openAIRes = formatGeminiToOpenAI(contentData, modelName);
     return new Response(JSON.stringify(openAIRes), {
@@ -142,4 +130,29 @@ export async function executeAntigravityRequest(
       Connection: "keep-alive",
     },
   });
+}
+
+/**
+ * Remove o prefixo do provedor e traduz nomes legados para os ids atuais do
+ * Cloud Code Assist (o upstream rejeita ids que não existem mais).
+ */
+export function normalizeAntigravityModel(modelName: string): string {
+  const clean = (modelName || "")
+    .replace(/^agy\//, "")
+    .replace(/^antigravity\//, "")
+    .trim();
+
+  const legacyAliases: Record<string, string> = {
+    "claude-3-7-sonnet": "claude-sonnet-4-6",
+    "claude-3.7-sonnet": "claude-sonnet-4-6",
+    "claude-3-5-sonnet": "claude-sonnet-4-6",
+    "claude-sonnet-4-5": "claude-sonnet-4-6",
+    "gemini-2.0-flash": "gemini-3-flash",
+    "gemini-2.5-flash": "gemini-3.5-flash-lite",
+    "gemini-2.5-pro": "gemini-3.1-pro-high",
+    "code-bison": "gemini-3.1-flash-lite",
+    "chat-bison": "gemini-3.1-flash-lite",
+  };
+
+  return legacyAliases[clean] || clean;
 }
