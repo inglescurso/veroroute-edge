@@ -20,6 +20,8 @@ export interface DiscoveryResult {
   error: string | null;
   /** "upstream" = lista real da API; "catalog" = catálogo local de fallback. */
   source: "upstream" | "catalog";
+  /** Diagnóstico por tentativa (status HTTP / formato da resposta). */
+  attempts?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +66,17 @@ function orderAntigravityModels(ids: string[], payload: any): string[] {
   return ordered;
 }
 
+/** Achata o payload do RPC aceitando { models } ou { response: { models } }. */
+function antigravityPayload(json: any): any {
+  if (json && typeof json === "object" && json.response && typeof json.response === "object") {
+    // Usa o envelope interno apenas quando ele realmente traz modelos.
+    if (json.response.models || json.response.availableModels || json.response.available_models) {
+      return json.response;
+    }
+  }
+  return json;
+}
+
 /**
  * Lista os modelos realmente disponíveis para uma conta do Antigravity CLI.
  *
@@ -78,15 +91,16 @@ export async function fetchAntigravityAvailableModels(
   timeoutMs = 8000
 ): Promise<DiscoveryResult> {
   if (!accessToken) {
-    return { models: [], error: "Access token do Antigravity ausente", source: "catalog" };
+    return { models: [], error: "Access token do Antigravity ausente", source: "catalog", attempts: [] };
   }
 
   const project = (projectId || ANTIGRAVITY_PUBLIC_CONFIG.defaultProjectId || "").trim();
   const body = JSON.stringify(project ? { project } : {});
-
+  const attempts: string[] = [];
   let lastError: string | null = null;
 
   for (const host of ANTIGRAVITY_DISCOVERY_HOSTS) {
+    const shortHost = host.replace("https://", "");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -102,27 +116,46 @@ export async function fetchAntigravityAvailableModels(
         signal: controller.signal,
       });
 
+      const rawBody = await res.text().catch(() => "");
+
       if (!res.ok) {
-        const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
-        lastError = `Cloud Code Assist HTTP ${res.status} (${host})${detail ? " — " + detail : ""}`;
+        const detail = rawBody.replace(/\s+/g, " ").slice(0, 140);
+        attempts.push(`${shortHost} HTTP ${res.status}${detail ? " — " + detail : ""}`);
+        lastError = `Cloud Code Assist HTTP ${res.status} (${shortHost})`;
         continue;
       }
 
-      const json: any = await res.json().catch(() => null);
-      const payload = json?.response && typeof json.response === "object" ? json.response : json;
-      const list = payload?.models ?? payload?.availableModels ?? payload?.available_models;
-      const raw = extractModelIds(list && typeof list === "object" && !Array.isArray(list) ? list : list);
-
-      if (raw.length > 0) {
-        return { models: orderAntigravityModels(raw, payload), error: null, source: "upstream" };
+      let json: any = null;
+      try {
+        json = JSON.parse(rawBody);
+      } catch {
+        attempts.push(`${shortHost} HTTP 200 mas resposta não-JSON: ${rawBody.replace(/\s+/g, " ").slice(0, 120)}`);
+        lastError = "Cloud Code Assist devolveu resposta não-JSON";
+        continue;
       }
 
-      lastError = `Cloud Code Assist respondeu sem modelos (${host})`;
+      const payload = antigravityPayload(json);
+      const list = payload?.models ?? payload?.availableModels ?? payload?.available_models;
+      const raw = extractModelIds(list);
+
+      if (raw.length > 0) {
+        return {
+          models: orderAntigravityModels(raw, payload),
+          error: null,
+          source: "upstream",
+          attempts,
+        };
+      }
+
+      const keys = payload && typeof payload === "object" ? Object.keys(payload).slice(0, 8).join(",") : String(payload);
+      attempts.push(
+        `${shortHost} HTTP 200 sem modelos (chaves=[${keys}], projeto="${project}", corpo=${rawBody.replace(/\s+/g, " ").slice(0, 140)})`
+      );
+      lastError = "Cloud Code Assist respondeu sem modelos";
     } catch (err: any) {
-      lastError =
-        err?.name === "AbortError"
-          ? `Timeout ao consultar Cloud Code Assist (${timeoutMs}ms)`
-          : err?.message || String(err);
+      const detail = err?.name === "AbortError" ? `timeout ${timeoutMs}ms` : err?.message || String(err);
+      attempts.push(`${shortHost} falhou — ${detail}`);
+      lastError = err?.name === "AbortError" ? `Timeout ao consultar Cloud Code Assist (${timeoutMs}ms)` : detail;
     } finally {
       clearTimeout(timer);
     }
@@ -132,6 +165,7 @@ export async function fetchAntigravityAvailableModels(
     models: [],
     error: lastError || "Falha desconhecida na descoberta Antigravity",
     source: "catalog",
+    attempts,
   };
 }
 
@@ -170,6 +204,7 @@ export async function fetchGeminiOpenAICompatModels(
         models: [],
         error: errJson?.error?.message || `Google OpenAI-compat HTTP ${res.status}`,
         source: "catalog",
+        attempts: [`${url} HTTP ${res.status}`],
       };
     }
 
@@ -179,6 +214,7 @@ export async function fetchGeminiOpenAICompatModels(
       models,
       error: models.length > 0 ? null : "Resposta da camada OpenAI-compat sem modelos",
       source: models.length > 0 ? "upstream" : "catalog",
+      attempts: [`${url} HTTP ${res.status} (${models.length} modelos)`],
     };
   } catch (err: any) {
     return {
@@ -188,6 +224,7 @@ export async function fetchGeminiOpenAICompatModels(
           ? `Timeout ao consultar ${url} (${timeoutMs}ms)`
           : err?.message || String(err),
       source: "catalog",
+      attempts: [`${url} falhou`],
     };
   } finally {
     clearTimeout(timer);

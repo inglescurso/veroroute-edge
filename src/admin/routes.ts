@@ -327,13 +327,19 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       const agyAuth = await getValidAntigravityAccessToken(c.env).catch(() => null);
       if (agyAuth?.accessToken) {
         // RPC oficial: POST /v1internal:fetchAvailableModels (Cloud Code Assist).
-        const discovery = await fetchAntigravityAvailableModels(agyAuth.accessToken, agyAuth.projectId);
+        let projectId = agyAuth.projectId || "";
+        if (!projectId) {
+          const { discoverCompanionProject } = await import("@/oauth/antigravity");
+          projectId = await discoverCompanionProject(agyAuth.accessToken).catch(() => "");
+        }
+        const discovery = await fetchAntigravityAvailableModels(agyAuth.accessToken, projectId);
         if (discovery.models.length > 0) {
           upstreamModels = discovery.models;
           upstreamFromApi = true;
         } else {
           upstreamModels = antigravityCatalog;
-          fetchError = "Antigravity: " + (discovery.error || "Cloud Code Assist não retornou modelos");
+          const detail = discovery.attempts?.length ? " [" + discovery.attempts.join(" | ") + "]" : "";
+          fetchError = "Antigravity: " + (discovery.error || "Cloud Code Assist não retornou modelos") + detail;
         }
       } else {
         upstreamModels = antigravityCatalog;
