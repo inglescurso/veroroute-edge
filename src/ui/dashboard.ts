@@ -2885,7 +2885,7 @@ git push origin master
       let provider = (window._providersData || []).find(function(x) { return x.id === preset.id; });
       if (!provider) {
         const keyValue = document.getElementById('acp-keys').value.trim();
-        if (!keyValue && preset.id !== 'cloudflare-ai' && preset.id !== 'openrouter-free') {
+        if (!keyValue && preset.id !== 'cloudflare-ai') {
           showToast('Template aplicado. Informe a chave e clique novamente em Buscar Modelos.', 'info');
           document.getElementById('acp-keys').focus();
           return;

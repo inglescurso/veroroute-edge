@@ -182,7 +182,8 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     name: "Pollinations.ai (Ilimitado / Keyless)",
     baseUrl: "https://text.pollinations.ai/openai",
     authType: "bearer",
-    models: ["openai", "mistral", "claude", "karma"],
+    // Alias gratuito atual e modelos de texto retornados pelo catalogo oficial.
+    models: ["openai", "deepseek/deepseek-v4.1-flash", "qwen/qwen3.8-flash", "openai/gpt-oss-20b"],
     freeTier: true,
     costPerMillionInput: 0,
     costPerMillionOutput: 0,
@@ -238,7 +239,8 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     name: "DeepSeek API",
     baseUrl: "https://api.deepseek.com/v1",
     authType: "bearer",
-    models: ["deepseek-chat", "deepseek-reasoner"],
+    // A DeepSeek aceita apenas deepseek-flash e deepseek-v4-pro (confirmado na API).
+    models: ["deepseek-flash", "deepseek-v4-pro"],
     freeTier: false,
     costPerMillionInput: 0.14,
     costPerMillionOutput: 0.28,

@@ -173,7 +173,11 @@ export async function executeOpenAICompatible(
     "antigravity", "agy", "1min", "cloudflare-ai", "cerebras", "groq",
     "gemini", "azure", "bedrock", "openrouter", "pollinations",
   ];
-  const providerPrefix = PROVIDER_PREFIXES.find((p) => targetModel.startsWith(p + "/"));
+  // Remove somente o prefixo do provedor que esta realmente executando a chamada.
+  // Ex.: no provider OpenRouter, "deepseek/deepseek-v4.1-flash" e um id nativo e
+  // NAO pode virar "deepseek-v4.1-flash".
+  const acceptedPrefixes = providerId === "antigravity" ? ["antigravity", "agy"] : [providerId];
+  const providerPrefix = PROVIDER_PREFIXES.find((p) => acceptedPrefixes.includes(p) && targetModel.startsWith(p + "/"));
   if (providerPrefix) {
     targetModel = targetModel.slice(providerPrefix.length + 1) || targetModel;
   }

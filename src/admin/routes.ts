@@ -19,7 +19,7 @@ import { extractBearer, resolvePrincipal, serverMisconfigured, unauthorized, mas
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
 import { executeCloudflareAI } from "@/adapters/cloudflare-ai";
 import type { ChatCompletionRequest } from "@/types/openai";
-import { selectActiveCredential } from "@/routing/keyPool";
+import { getProviderCredentials, markKeyRateLimited, selectActiveCredential } from "@/routing/keyPool";
 import { getAntigravityOAuthCredentials } from "./store";
 import type { EnvBindings } from "@/types/provider";
 import { getUsageSummary } from "@/routing/costTracker";
@@ -796,24 +796,48 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
     ? body.models.slice(0, 12)
     : discovered.slice(0, 12);
 
+  // Testes de catalogo respeitam a limitacao de fila do Pollinations:
+  // Promise.all causa uma rajada e transforma um 429 transitorio em varias falhas.
   if (targetModels.length === 0) {
     return c.json({ ok: false, results: [], message: "Nenhum modelo cadastrado para testar" });
   }
 
-  let apiKey = body.apiKey?.trim() || "";
-  if (!apiKey) {
-    apiKey = (await selectActiveCredential(c.env, id)).apiKey;
-  }
+  const explicitKey = body.apiKey?.trim() || "";
+  const providerCredentials = explicitKey
+    ? [{ apiKey: explicitKey }]
+    : await getProviderCredentials(c.env, id);
+  const apiKey = providerCredentials[0]?.apiKey || "";
   if (!apiKey && id !== "cloudflare-ai" && id !== "antigravity" && id !== "pollinations" && id !== "freeapikey") {
     return c.json({ error: { message: "Sem chave de API configurada para testar este provedor", type: "auth" } }, 401);
   }
 
   const effectiveBaseUrl = body.baseUrl?.trim() || cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined) || prov?.baseUrl;
 
-  const providerTestTimeoutMs = id === "antigravity" ? 30000 : 12000;
-  const results = await Promise.all(
-    targetModels.map((model) => executeDirectProviderTest(c.env, id, apiKey, model, providerTestTimeoutMs, effectiveBaseUrl))
-  );
+  const providerTestTimeoutMs = id === "antigravity" || id === "nvidia" || id === "cheaperinference" ? 30000 : 12000;
+  const results: Awaited<ReturnType<typeof executeDirectProviderTest>>[] = [];
+  // Chaves limitadas ficam indisponiveis para os modelos seguintes deste mesmo teste.
+  let usableCredentials = providerCredentials;
+  for (const model of targetModels) {
+    // Sequencial: evita rajadas de 429 por cota, fila ou concorrencia do provedor.
+    let result: Awaited<ReturnType<typeof executeDirectProviderTest>> | undefined;
+    let limitedKey = "";
+    for (let keyIndex = 0; keyIndex < Math.max(usableCredentials.length, 1); keyIndex++) {
+      const currentKey = usableCredentials[keyIndex]?.apiKey || apiKey;
+      result = await executeDirectProviderTest(c.env, id, currentKey, model, providerTestTimeoutMs, effectiveBaseUrl);
+      if (result.status !== 429) break;
+      limitedKey = currentKey;
+      if (currentKey) await markKeyRateLimited(c.env, currentKey, 60);
+      if (keyIndex + 1 < usableCredentials.length) continue;
+      // Uma repeticao curta separa fila cheia transitoria de cota realmente esgotada.
+      await new Promise((resolve) => setTimeout(resolve, id === "pollinations" ? 2500 : 1000));
+      result = await executeDirectProviderTest(c.env, id, currentKey, model, providerTestTimeoutMs, effectiveBaseUrl);
+    }
+    // A chave limitada sai da rotacao deste teste, mas as demais continuam tentando.
+    if (result?.status === 429 && limitedKey && usableCredentials.length > 1) {
+      usableCredentials = usableCredentials.filter((entry) => entry.apiKey !== limitedKey);
+    }
+    results.push(result!);
+  }
 
   return c.json({ ok: true, results });
 });
@@ -889,10 +913,12 @@ adminRouter.post("/models", async (c) => {
 // ---------------------------------------------------------------------------
 export const FREE_PROVIDER_PRESETS = [
   { id: "gemini", name: "Google Gemini (AI Studio Free)", eloRank: 1, protocol: "openai", baseUrl: "https://generativelanguage.googleapis.com/v1beta", models: ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"], recommendedModels: ["gemini-2.5-flash", "gemini-2.0-flash"], freeTier: true, freeTierNotes: "60M tokens/mes", supportsStreaming: true, supportsTools: true, supportsVision: true },
-  { id: "groq", name: "Groq LPU (Ultra-Fast Inference)", eloRank: 2, protocol: "openai", baseUrl: "https://api.groq.com/openai/v1", models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-coder-32b", "gemma2-9b-it"], recommendedModels: ["llama-3.3-70b-versatile"], freeTier: true, freeTierNotes: "6.000 reqs/dia", supportsStreaming: true, supportsTools: true, supportsVision: false },
-  { id: "cerebras", name: "Cerebras WSE-3", eloRank: 3, protocol: "openai", baseUrl: "https://api.cerebras.ai/v1", models: ["llama3.3-70b", "llama3.1-8b"], recommendedModels: ["llama3.3-70b"], freeTier: true, freeTierNotes: "1M tokens/dia", supportsStreaming: true, supportsTools: true, supportsVision: false },
+  { id: "groq", name: "Groq LPU (Ultra-Fast Inference)", eloRank: 2, protocol: "openai", baseUrl: "https://api.groq.com/openai/v1", models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"], recommendedModels: ["openai/gpt-oss-120b"], freeTier: true, freeTierNotes: "6.000 reqs/dia", supportsStreaming: true, supportsTools: true, supportsVision: false },
+  { id: "cerebras", name: "Cerebras WSE-3", eloRank: 3, protocol: "openai", baseUrl: "https://api.cerebras.ai/v1", models: ["gpt-oss-120b", "qwen-3.8-27b"], recommendedModels: ["gpt-oss-120b"], freeTier: true, freeTierNotes: "1M tokens/dia", supportsStreaming: true, supportsTools: true, supportsVision: false },
   { id: "sambanova", name: "SambaNova Systems", eloRank: 4, protocol: "openai", baseUrl: "https://api.sambanova.ai/v1", models: ["Meta-Llama-3.3-70B-Instruct", "Qwen2.5-72B-Instruct"], recommendedModels: ["Meta-Llama-3.3-70B-Instruct"], freeTier: true, freeTierNotes: "LPU gratuito", supportsStreaming: true, supportsTools: true, supportsVision: false },
-  { id: "openrouter-free", name: "OpenRouter Free Models", eloRank: 5, protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", models: ["deepseek/deepseek-r1-0528:free", "deepseek/deepseek-chat-v3-0324:free"], recommendedModels: ["deepseek/deepseek-r1-0528:free"], freeTier: true, freeTierNotes: "Modelos gratuitos", supportsStreaming: true, supportsTools: false, supportsVision: false },
+  // O id do template e "openrouter": "openrouter-free" nao existe como provedor e
+  // fazia o teste responder "Provedor desconhecido". Os modelos :free vem do proprio catalogo.
+  { id: "openrouter", name: "OpenRouter (modelos gratuitos)", eloRank: 5, protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", models: ["deepseek/deepseek-v4.1-flash", "inclusionai/ling-3.0-flash-vl:free"], recommendedModels: ["inclusionai/ling-3.0-flash-vl:free"], freeTier: true, freeTierNotes: "Modelos gratuitos (:free)", supportsStreaming: true, supportsTools: false, supportsVision: false },
   { id: "cloudflare-ai", name: "Cloudflare Workers AI (Native)", eloRank: 6, protocol: "openai", baseUrl: "workers-ai", models: ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct"], recommendedModels: ["@cf/meta/llama-3.3-70b-instruct-fp8-fast"], freeTier: true, freeTierNotes: "10.000 neuronios/dia", supportsStreaming: true, supportsTools: false, supportsVision: false },
 ];
 

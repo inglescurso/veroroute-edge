@@ -15,6 +15,10 @@ export const GEMINI_OPENAI_COMPAT_BASE_URL = "https://generativelanguage.googlea
 const PROVIDER_ALIASES: Record<string, string> = {
   agy: "antigravity",
   "antigravity-cli": "antigravity",
+  // Aliases antigos/gerados a partir dos nomes dos templates da interface.
+  "openrouter-free": "openrouter",
+  "openrouter-free-models": "openrouter",
+  "groq-lpu-ultra-fast-inference": "groq",
 };
 
 /** Converte um alias de provedor no seu id canônico. */
