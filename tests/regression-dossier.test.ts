@@ -178,5 +178,112 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
     expect(classifyError(504, "Gateway timeout")).toBe("timeout");
     expect(classifyError(500, "Internal error")).toBe("outro_erro");
   });
+
+  // -------------------------------------------------------------------------
+  // Fase 5: Migração e Saneamento de Dados KV (Falha 5, Falha 6 e Falha 9)
+  // -------------------------------------------------------------------------
+  it("Fase 5: migrateAdminConfigToV2 consolida provedores duplicados e limpa customModels redundantes", async () => {
+    const { migrateAdminConfigToV2 } = await import("@/admin/store");
+
+    const mockConfig: any = {
+      version: 1,
+      _seq: 1,
+      customProviders: {
+        "openrouter-free-models": {
+          id: "openrouter-free-models",
+          name: "OpenRouter Free",
+          baseUrl: "https://openrouter.ai/api/v1",
+          apiKeys: ["sk-or-real-key-12345"],
+          models: ["deepseek/deepseek-v4.1-flash"],
+        },
+        "groq-lpu-ultra-fast-inference": {
+          id: "groq-lpu-ultra-fast-inference",
+          name: "Groq LPU",
+          baseUrl: "https://api.groq.com/openai/v1",
+          apiKeys: ["gsk-real-key-99999"],
+          models: ["openai/gpt-oss-120b"],
+        },
+      },
+      providerStates: {
+        "openrouter-free-models": { enabled: true },
+      },
+      customModels: {
+        antigravity: [
+          "gemini-3.7-flash-high",
+          "gemini-3.7-flash-medium",
+          "gemini-3.7-flash-low",
+          "gemini-3.7-flash-tiered",
+          "gemini-3.6-flash-tiered",
+          "gemini-3.5-flash-lite",
+          "gemini-3.1-pro-high",
+          "gemini-3.1-pro-low",
+          "gemini-3.1-flash-lite",
+          "claude-opus-4-6-thinking",
+          "claude-sonnet-4-6",
+          "gpt-oss-120b-medium",
+        ],
+        deepseek: ["deepseek-chat", "meu-modelo-customizado-novo"],
+      },
+      combos: {
+        "combo-teste": {
+          id: "combo-teste",
+          name: "Teste",
+          strategy: "priority",
+          targets: [
+            { provider: "groq-lpu-ultra-fast-inference", model: "llama-3.3-70b" },
+            { provider: "openrouter-free-models", model: "openrouter/free" },
+          ],
+          enabled: true,
+        },
+      },
+    };
+
+    const migrated = await migrateAdminConfigToV2(undefined, mockConfig);
+    expect(migrated).toBe(true);
+    expect(mockConfig.version).toBe(2);
+
+    // Duplicatas foram removidas de customProviders
+    expect(mockConfig.customProviders["openrouter-free-models"]).toBeUndefined();
+    expect(mockConfig.customProviders["groq-lpu-ultra-fast-inference"]).toBeUndefined();
+
+    // antigravity tinha apenas modelos do catálogo estático — foi limpo integralmente
+    expect(mockConfig.customModels["antigravity"]).toBeUndefined();
+
+    // deepseek tinha modelo customizado genuíno — manteve apenas o genuíno
+    expect(mockConfig.customModels["deepseek"]).toEqual(["meu-modelo-customizado-novo"]);
+
+    // Combos agora apontam para provedores canônicos
+    expect(mockConfig.combos["combo-teste"].targets[0].provider).toBe("groq");
+    expect(mockConfig.combos["combo-teste"].targets[1].provider).toBe("openrouter");
+
+    // Idempotência: segunda execução não altera nada e retorna false
+    const secondRun = await migrateAdminConfigToV2(undefined, mockConfig);
+    expect(secondRun).toBe(false);
+  });
+
+  it("Fase 5: Migração aplicada com sucesso sobre o snapshot real do KV de produção", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { migrateAdminConfigToV2 } = await import("@/admin/store");
+
+    const backupPath = path.resolve(process.cwd(), "backups/kv-production-backup-20260917.json");
+    expect(fs.existsSync(backupPath)).toBe(true);
+
+    const prodSnapshot = JSON.parse(fs.readFileSync(backupPath, "utf-8"));
+    expect(prodSnapshot.version).toBeFalsy();
+    expect(Object.keys(prodSnapshot.customProviders).length).toBe(5);
+
+    const migrated = await migrateAdminConfigToV2(undefined, prodSnapshot);
+    expect(migrated).toBe(true);
+    expect(prodSnapshot.version).toBe(2);
+
+    // Todos os 5 provedores duplicados foram eliminados
+    expect(Object.keys(prodSnapshot.customProviders).length).toBe(0);
+
+    // Modelos estáticos redundantes foram saneados de customModels (de 12 caiu para os 6 modelos novos não estáticos)
+    expect(prodSnapshot.customModels["antigravity"].length).toBe(6);
+    expect(prodSnapshot.customModels["openrouter"]).toBeDefined();
+  });
 });
+
 

@@ -19,6 +19,8 @@ const PROVIDER_ALIASES: Record<string, string> = {
   "openrouter-free": "openrouter",
   "openrouter-free-models": "openrouter",
   "groq-lpu-ultra-fast-inference": "groq",
+  "cerebras-wse-3": "cerebras",
+  "cloudflare-workers-ai-native": "cloudflare-ai",
 };
 
 /** Converte um alias de provedor no seu id canônico. */

@@ -1,6 +1,8 @@
 import type { EnvBindings } from "@/types/provider";
 import { ANTIGRAVITY_PUBLIC_CONFIG } from "@/config/constants";
 import { normalizeProviderId } from "@/config/providerAliases";
+import { getStaticCatalog } from "@/config/modelRegistry";
+import { PROVIDER_REGISTRY } from "@/config/providers";
 export interface ProviderCredential {
   apiKey: string;
 }
@@ -138,7 +140,7 @@ const DEFAULT_COMBOS: Record<string, ComboConfig> = {
 export { DEFAULT_COMBOS };
 
 const DEFAULT_ADMIN_CONFIG: AdminConfig = {
-  version: 1,
+  version: 2,
   _seq: 0,
   _deletedDefaultCombos: [],
   providerStates: {},
@@ -186,6 +188,170 @@ function mergeComos(p: Partial<AdminConfig>): Record<string, ComboConfig> {
   return { ...base, ...(p.combos ?? {}) };
 }
 
+/**
+ * Migração Idempotente de Configuração do Painel Administrativo para v2 (Fase 5).
+ * - Saneia provedores customizados duplicados (openrouter-free, groq-lpu, cerebras-wse, cloudflare-workers-ai-native)
+ * - Transfere credenciais de chaves para os provedores canônicos sem perda
+ * - Limpa modelos duplicados em customModels que já constam nos catálogos estáticos
+ * - Ajusta alvos de combos para apontar para provedores canônicos
+ */
+export async function migrateAdminConfigToV2(
+  env: EnvBindings | undefined,
+  cfg: AdminConfig
+): Promise<boolean> {
+  if (cfg.version && cfg.version >= 2) {
+    return false;
+  }
+
+  cfg.customProviders = cfg.customProviders || {};
+  cfg.customModels = cfg.customModels || {};
+  cfg.removedModels = cfg.removedModels || {};
+  cfg.providerStates = cfg.providerStates || {};
+  cfg.combos = cfg.combos || {};
+  cfg.virtualKeys = cfg.virtualKeys || {};
+  cfg.providerBaseUrls = cfg.providerBaseUrls || {};
+  cfg.modelStates = cfg.modelStates || {};
+
+  let modified = false;
+  const kv = env?.OMNI_KEYS;
+
+  // 1. Consolidar provedores customizados que são duplicatas de provedores canônicos
+  const customProviderEntries = Object.entries(cfg.customProviders);
+  for (const [dupId, dupProv] of customProviderEntries) {
+    const canonicalId = normalizeProviderId(dupId);
+    if (canonicalId !== dupId) {
+      // a) Resgatar credenciais reais do KV (sem máscara) ou do objeto
+      let realKeys: string[] = [];
+
+      if (kv) {
+        const rawCreds = await kv.get("credentials_" + dupId);
+        if (rawCreds) {
+          try {
+            const parsed = JSON.parse(rawCreds);
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                if (item?.apiKey && typeof item.apiKey === "string" && !item.apiKey.includes("***")) {
+                  realKeys.push(item.apiKey.trim());
+                }
+              }
+            }
+          } catch {}
+        }
+        const legacyKeys = await kv.get(KV_CUSTOM_KEYS_PREFIX + dupId);
+        if (legacyKeys) {
+          for (const k of legacyKeys.split(",")) {
+            const trimmed = k.trim();
+            if (trimmed && !trimmed.includes("***")) {
+              realKeys.push(trimmed);
+            }
+          }
+        }
+      }
+
+      // Adicionar chaves de dupProv.apiKeys se não forem mascaradas
+      for (const k of (dupProv.apiKeys || [])) {
+        const trimmed = (k || "").trim();
+        if (trimmed && !trimmed.includes("***")) {
+          realKeys.push(trimmed);
+        }
+      }
+
+      realKeys = Array.from(new Set(realKeys));
+
+      // Se encontramos chaves reais, salvamos no provedor canônico
+      if (realKeys.length > 0) {
+        if (env) {
+          await appendProviderKeys(env, canonicalId, realKeys);
+        }
+        if (cfg.customProviders[canonicalId]) {
+          const cur = cfg.customProviders[canonicalId].apiKeys || [];
+          cfg.customProviders[canonicalId].apiKeys = Array.from(new Set([...cur, ...realKeys]));
+        }
+      }
+
+      // b) Mesclar modelos de customModels se existirem
+      const dupModels = dupProv.models || [];
+      const dupCustomModels = cfg.customModels[dupId] || [];
+      const combinedModels = Array.from(new Set([...dupModels, ...dupCustomModels]));
+      if (combinedModels.length > 0) {
+        cfg.customModels[canonicalId] = Array.from(
+          new Set([...(cfg.customModels[canonicalId] || []), ...combinedModels])
+        );
+      }
+
+      // c) Mesclar providerStates
+      if (cfg.providerStates[dupId]) {
+        if (!cfg.providerStates[canonicalId]) {
+          cfg.providerStates[canonicalId] = cfg.providerStates[dupId];
+        }
+        delete cfg.providerStates[dupId];
+      }
+
+      // d) Limpar chaves da duplicata no KV
+      if (kv) {
+        try {
+          await Promise.all([
+            kv.delete("credentials_" + dupId),
+            kv.delete(KV_CUSTOM_KEYS_PREFIX + dupId),
+          ]);
+        } catch { /* best effort */ }
+      }
+
+      delete cfg.customProviders[dupId];
+      delete cfg.customModels[dupId];
+      delete cfg.removedModels[dupId];
+      modified = true;
+    }
+  }
+
+  // 2. Limpar modelos redundantes de customModels
+  for (const [pId, models] of Object.entries(cfg.customModels || {})) {
+    const canonicalId = normalizeProviderId(pId);
+    if (canonicalId !== pId) {
+      cfg.customModels[canonicalId] = Array.from(
+        new Set([...(cfg.customModels[canonicalId] || []), ...models])
+      );
+      delete cfg.customModels[pId];
+      modified = true;
+    }
+
+    const targetId = canonicalId;
+    const currentModels = cfg.customModels[targetId] || [];
+    const staticModels = new Set([
+      ...(getStaticCatalog(targetId) || []),
+      ...(PROVIDER_REGISTRY[targetId]?.models || []),
+    ]);
+
+    // Filtrar os modelos que já estão no catálogo estático
+    const cleaned = currentModels.filter((m) => !staticModels.has(m));
+    const uniqueCleaned = Array.from(new Set(cleaned));
+
+    if (uniqueCleaned.length === 0) {
+      delete cfg.customModels[targetId];
+      modified = true;
+    } else if (uniqueCleaned.length !== currentModels.length) {
+      cfg.customModels[targetId] = uniqueCleaned;
+      modified = true;
+    }
+  }
+
+  // 3. Atualizar combos para usar provedores canônicos
+  for (const combo of Object.values(cfg.combos || {})) {
+    if (combo.targets && Array.isArray(combo.targets)) {
+      for (const target of combo.targets) {
+        const norm = normalizeProviderId(target.provider);
+        if (norm !== target.provider) {
+          target.provider = norm;
+          modified = true;
+        }
+      }
+    }
+  }
+
+  cfg.version = 2;
+  return true;
+}
+
 export async function getAdminConfig(env: EnvBindings): Promise<AdminConfig> {
   const now = Date.now();
   if (cache && now - cache.ts < CACHE_TTL_MS) return cloneConfig(cache.data);
@@ -217,6 +383,14 @@ export async function getAdminConfig(env: EnvBindings): Promise<AdminConfig> {
         antigravityConfig: p.antigravityConfig,
         providerBaseUrls: { ...(p.providerBaseUrls ?? {}) },
       };
+
+      if (!p.version || p.version < 2) {
+        const migrated = await migrateAdminConfigToV2(env, merged);
+        if (migrated && kv) {
+          await kv.put(KV_ADMIN_KEY, JSON.stringify(merged));
+        }
+      }
+
       cache = { data: merged, ts: now };
       return cloneConfig(merged);
     }
