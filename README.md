@@ -27,6 +27,13 @@
 >
 > 🚀 **Guia de implantação / Deployment guide:** [veroroute.24hs.eu.org/#deploy](https://veroroute.24hs.eu.org/#deploy)
 
+### 🎥 Vídeo tutorial de instalação
+
+[![Como instalar e configurar o VeroRoute Edge passo a passo](https://i.ytimg.com/vi/Qv4iJX8XCD8/maxresdefault.jpg)](https://www.youtube.com/watch?v=Qv4iJX8XCD8)
+
+**PT-BR:** [Como Instalar e Configurar o VeroRoute Edge Passo a Passo](https://www.youtube.com/watch?v=Qv4iJX8XCD8) · canal [Samuca Tutoriais](https://www.youtube.com/@SamucaTutoriais)
+
+
 </div>
 
 ---

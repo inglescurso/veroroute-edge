@@ -1563,6 +1563,25 @@ dsh --model combo-super-payload
       </div>
 
       <!-- Como Manter sua Instância Atualizada -->
+      <!-- Video tutorial de instalacao (fachada: sem requisicao a terceiros ate o clique) -->
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 0.5rem;">🎥 Vídeo tutorial de instalação</div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem;">
+          Assista ao processo completo: fork, conexão com o GitHub, deploy no Cloudflare e configuração do <code>AUTH_TOKEN</code>.
+        </p>
+        <div id="video-guide-facade" role="button" tabindex="0" onclick="playInstallVideo()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();playInstallVideo();}" style="position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 560px; margin: 0 auto; border-radius: 10px; overflow: hidden; border: 1px solid var(--card-border); background: #000; cursor: pointer;">
+          <img src="https://i.ytimg.com/vi/Qv4iJX8XCD8/maxresdefault.jpg" alt="Miniatura do tutorial de instalação do VeroRoute Edge" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2, 6, 16, 0.35);">
+            <div style="width: 68px; height: 48px; border-radius: 12px; background: #ff0000; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.6);">
+              <span style="color: #fff; font-size: 1.4rem; margin-left: 4px;">▶</span>
+            </div>
+          </div>
+        </div>
+        <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin: 0.7rem 0 0;">
+          O vídeo só é carregado quando você clicar · <a href="https://www.youtube.com/watch?v=Qv4iJX8XCD8" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 600; text-decoration: none;">abrir no YouTube ↗</a>
+        </p>
+      </div>
+
       <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 0.5rem;">🔄 Como Atualizar Sua Instância (Sem Perder Configurações)</div>
         <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.6rem;">
@@ -1604,6 +1623,20 @@ git push origin master
     function openAboutModal() {
       var m = document.getElementById('modal-about');
       if (m) m.classList.add('active');
+    }
+
+    function playInstallVideo() {
+      var facade = document.getElementById('video-guide-facade');
+      if (!facade || facade.dataset.playing === 'true') return;
+      facade.dataset.playing = 'true';
+      var frame = document.createElement('iframe');
+      frame.src = 'https://www.youtube-nocookie.com/embed/Qv4iJX8XCD8?autoplay=1&rel=0';
+      frame.title = 'Como instalar e configurar o VeroRoute Edge passo a passo';
+      frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      frame.allowFullscreen = true;
+      frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;';
+      facade.innerHTML = '';
+      facade.appendChild(frame);
     }
 
     function closeAboutModal() {
