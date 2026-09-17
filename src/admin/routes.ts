@@ -60,9 +60,8 @@ adminRouter.use("*", async (c, next) => {
 // ---------------------------------------------------------------------------
 adminRouter.get("/config", async (c) => {
   const cfg = await getAdminConfig(c.env);
-  const providers: unknown[] = [];
 
-  for (const [id, staticCfg] of Object.entries(PROVIDER_REGISTRY)) {
+  const builtInPromises = Object.entries(PROVIDER_REGISTRY).map(async ([id, staticCfg]) => {
     const state = cfg.providerStates[id]?.enabled ?? true;
     const removed = new Set(cfg.removedModels?.[id] || []);
     const customModels = (cfg.customModels[id] || []).filter((m) => !removed.has(m));
@@ -72,7 +71,7 @@ adminRouter.get("/config", async (c) => {
     const keys = await getCustomProviderKeys(c.env, id);
     const customBaseUrl = cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined);
     const effectiveBaseUrl = customBaseUrl || staticCfg.baseUrl || "";
-    providers.push({
+    return {
       id,
       name: staticCfg.name,
       isBuiltIn: true,
@@ -89,15 +88,15 @@ adminRouter.get("/config", async (c) => {
       supportsVision: staticCfg.supportsVision,
       keyCount: keys.length,
       keys: keys.map(maskSecret), // C-2
-    });
-  }
+    };
+  });
 
-  for (const [id, cp] of Object.entries(cfg.customProviders)) {
+  const customPromises = Object.entries(cfg.customProviders).map(async ([id, cp]) => {
     const keys = await getCustomProviderKeys(c.env, id);
     const removed = new Set(cfg.removedModels?.[id] || []);
     const finalModels = (cp.models || []).filter((m) => !removed.has(m) && cfg.modelStates[id + "/" + m]?.enabled !== false);
     const customBaseUrl = cfg.providerBaseUrls?.[id];
-    providers.push({
+    return {
       id,
       name: cp.name,
       isBuiltIn: false,
@@ -114,8 +113,15 @@ adminRouter.get("/config", async (c) => {
       supportsVision: cp.supportsVision,
       keyCount: keys.length,
       keys: keys.map(maskSecret), // C-2
-    });
-  }
+    };
+  });
+
+  const [builtInProviders, customProvidersList] = await Promise.all([
+    Promise.all(builtInPromises),
+    Promise.all(customPromises),
+  ]);
+
+  const providers = [...builtInProviders, ...customProvidersList];
 
   return c.json({
     providers,

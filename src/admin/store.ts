@@ -260,8 +260,35 @@ export async function migrateAdminConfigToV2(
 
       // Se encontramos chaves reais, salvamos no provedor canônico
       if (realKeys.length > 0) {
-        if (env) {
-          await appendProviderKeys(env, canonicalId, realKeys);
+        if (kv) {
+          // Salvar diretamente no KV sem chamar mutateAdminConfig (para evitar recursão)
+          const existingRaw = await kv.get("credentials_" + canonicalId);
+          let existingCreds: ProviderCredential[] = [];
+          if (existingRaw) {
+            try {
+              const parsed = JSON.parse(existingRaw);
+              if (Array.isArray(parsed)) existingCreds = parsed;
+            } catch {}
+          }
+          const mergedCreds = Array.from(
+            new Map(
+              [...existingCreds, ...realKeys.map((k) => ({ apiKey: k }))]
+                .filter((item) => item && item.apiKey && !item.apiKey.includes("***"))
+                .map((item) => [item.apiKey, item])
+            ).values()
+          );
+          await Promise.all([
+            kv.put("credentials_" + canonicalId, JSON.stringify(mergedCreds)),
+            kv.put(KV_CUSTOM_KEYS_PREFIX + canonicalId, mergedCreds.map((c) => c.apiKey).join(",")),
+          ]);
+        } else {
+          inMemoryCredentials[canonicalId] = Array.from(
+            new Map(
+              [...(inMemoryCredentials[canonicalId] || []), ...realKeys.map((k) => ({ apiKey: k }))]
+                .filter((item) => item && item.apiKey && !item.apiKey.includes("***"))
+                .map((item) => [item.apiKey, item])
+            ).values()
+          );
         }
         if (cfg.customProviders[canonicalId]) {
           const cur = cfg.customProviders[canonicalId].apiKeys || [];
@@ -385,9 +412,13 @@ export async function getAdminConfig(env: EnvBindings): Promise<AdminConfig> {
       };
 
       if (!p.version || p.version < 2) {
-        const migrated = await migrateAdminConfigToV2(env, merged);
-        if (migrated && kv) {
-          await kv.put(KV_ADMIN_KEY, JSON.stringify(merged));
+        try {
+          const migrated = await migrateAdminConfigToV2(env, merged);
+          if (migrated && kv) {
+            await kv.put(KV_ADMIN_KEY, JSON.stringify(merged));
+          }
+        } catch (mErr) {
+          console.error("[VeroRoute Store] Erro durante migrateAdminConfigToV2:", mErr);
         }
       }
 
