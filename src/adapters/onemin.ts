@@ -1,6 +1,5 @@
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk } from "@/types/openai";
 
-const ONEMIN_BASE = "https://api.1min.ai/api/features";
 
 /**
  * Execute 1min.ai request — clean adapter, no internal tool emulation.

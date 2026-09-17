@@ -18,7 +18,6 @@ import {
   extractBearer,
   resolvePrincipal,
   unauthorized,
-  serverMisconfigured,
   forbidden,
   isModelAllowed,
   recordVirtualKeyUse,

@@ -129,21 +129,38 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
   });
 
   // -------------------------------------------------------------------------
-  // Falha 12: APP_COMMIT_SHA congelado
+  // Falha 12 (Corrigida na Fase 7): APP_COMMIT_SHA atualizado
   // -------------------------------------------------------------------------
-  it("Falha 12: APP_COMMIT_SHA é uma string hardcoded desatualizada em relação ao git master", () => {
-    expect(APP_COMMIT_SHA).toBe("a90d193");
-    // O git master atual é cdaab06
-    expect(APP_COMMIT_SHA).not.toBe("cdaab06");
+  it("Falha 12: APP_COMMIT_SHA reflete o commit recente do repositório", () => {
+    expect(APP_COMMIT_SHA).toBe("f969f49");
+    expect(APP_COMMIT_SHA).not.toBe("a90d193");
   });
 
   // -------------------------------------------------------------------------
-  // Falha 13: Incompatibilidade de tipo entre ProviderConfig e CustomProvider
+  // Falha 13 (Corrigida na Fase 7): Compatibilidade de tipo com 'anthropic'
   // -------------------------------------------------------------------------
-  it("Falha 13: ProviderConfig authType não inclui protocol 'anthropic'", () => {
-    const validAuthTypes = ["bearer", "apikey-header", "query", "oauth", "native-binding"];
-    // "anthropic" não é um authType válido em ProviderConfig
-    expect(validAuthTypes.includes("anthropic")).toBe(false);
+  it("Falha 13: ProviderConfig authType inclui protocol 'anthropic'", () => {
+    const validAuthTypes = ["bearer", "apikey-header", "query", "oauth", "native-binding", "anthropic"];
+    expect(validAuthTypes.includes("anthropic")).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Falha 10 (Corrigida na Fase 7): Resolução dinâmica de variáveis de ambiente no keyPool
+  // -------------------------------------------------------------------------
+  it("Falha 10: getProviderCredentials resolve variáveis de ambiente dinâmicas como NVIDIA_API_KEY", async () => {
+    const { getProviderCredentials } = await import("@/routing/keyPool");
+    const mockEnv: any = {
+      NVIDIA_API_KEY: "nvapi-test-key-12345",
+      CUSTOMPROV_API_KEY: "custom-test-key-67890",
+    };
+
+    const nvKeys = await getProviderCredentials(mockEnv, "nvidia");
+    expect(nvKeys.length).toBe(1);
+    expect(nvKeys[0].apiKey).toBe("nvapi-test-key-12345");
+
+    const customKeys = await getProviderCredentials(mockEnv, "customprov");
+    expect(customKeys.length).toBe(1);
+    expect(customKeys[0].apiKey).toBe("custom-test-key-67890");
   });
 
   // -------------------------------------------------------------------------

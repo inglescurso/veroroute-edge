@@ -1,4 +1,4 @@
-import { getProviderConfig, PROVIDER_REGISTRY } from "@/config/providers";
+import { getProviderConfig } from "@/config/providers";
 import { GEMINI_OPENAI_COMPAT_BASE_URL, resolveGeminiSurface } from "@/config/providerAliases";
 import { formatGeminiSSEChunkToOpenAI, formatGeminiToOpenAI, formatOpenAIToGemini } from "./gemini";
 import type { ChatCompletionRequest } from "@/types/openai";

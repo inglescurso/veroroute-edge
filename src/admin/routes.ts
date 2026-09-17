@@ -15,7 +15,7 @@ import {
   type CustomProvider,
   type ComboConfig,
 } from "./store";
-import { extractBearer, resolvePrincipal, serverMisconfigured, unauthorized, maskSecret } from "./auth";
+import { extractBearer, resolvePrincipal, unauthorized, maskSecret } from "./auth";
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
 import { executeCloudflareAI } from "@/adapters/cloudflare-ai";
 import type { ChatCompletionRequest } from "@/types/openai";

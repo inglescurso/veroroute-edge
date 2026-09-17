@@ -8,6 +8,7 @@ const keyCooldowns: Map<string, number> = new Map();
 const KV_COOLDOWN_PREFIX = "cooldown:";
 
 function environmentCredentials(env: EnvBindings, providerId: string): ProviderCredential[] {
+  const normId = normalizeProviderId(providerId);
   const e = env as any;
   const envKeyMap: Record<string, string | undefined> = {
     openai: env.OPENAI_API_KEYS || e.OPENAI_API_KEY,
@@ -27,11 +28,20 @@ function environmentCredentials(env: EnvBindings, providerId: string): ProviderC
     tavily: env.TAVILY_API_KEYS || e.TAVILY_API_KEY,
     serper: env.SERPER_API_KEYS || e.SERPER_API_KEY,
     firecrawl: env.FIRECRAWL_API_KEYS || env.FIRECRAWL_API_KEY,
+    nvidia: e.NVIDIA_API_KEYS || e.NVIDIA_API_KEY,
   };
-  return (envKeyMap[providerId] || "").split(",").map((apiKey) => apiKey.trim()).filter(Boolean).map((apiKey) => ({ apiKey }));
+
+  let raw = envKeyMap[normId] || envKeyMap[providerId];
+  if (!raw) {
+    const cleanId = normId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    raw = e[cleanId + "_API_KEYS"] || e[cleanId + "_API_KEY"] || e[cleanId + "_KEY"];
+  }
+
+  return (raw || "").split(",").map((apiKey) => apiKey.trim()).filter(Boolean).map((apiKey) => ({ apiKey }));
 }
 
 export async function getProviderCredentials(env: EnvBindings, providerId: string): Promise<ProviderCredential[]> {
+  providerId = normalizeProviderId(providerId);
   const all = [...environmentCredentials(env, providerId), ...await getStoredProviderCredentials(env, providerId)];
   const seen = new Set<string>();
   return all.filter((entry) => {

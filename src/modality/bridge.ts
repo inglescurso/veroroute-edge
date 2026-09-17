@@ -1,4 +1,3 @@
-import { PROVIDER_REGISTRY } from "@/config/providers";
 import { executeOpenAICompatible } from "@/adapters/openai-compatible";
 import { selectActiveCredential } from "@/routing/keyPool";
 import type { ChatCompletionRequest, ChatMessage, ChatMessageContentPart } from "@/types/openai";

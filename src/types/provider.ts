@@ -64,7 +64,8 @@ export interface ProviderConfig {
   id: ProviderId;
   name: string;
   baseUrl?: string;
-  authType: "bearer" | "apikey-header" | "query" | "oauth" | "native-binding";
+  authType: "bearer" | "apikey-header" | "query" | "oauth" | "native-binding" | "anthropic";
+  protocol?: "openai" | "anthropic";
   headerName?: string;
   models: string[];
   freeTier: boolean;

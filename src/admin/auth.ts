@@ -51,12 +51,6 @@ export async function resolvePrincipal(
   return null;
 }
 
-export function serverMisconfigured(): Response {
-  return Response.json(
-    { error: { message: "Servico indisponivel — AUTH_TOKEN nao configurado", type: "server_error" } },
-    { status: 503 }
-  );
-}
 
 export function unauthorized(): Response {
   return Response.json(
