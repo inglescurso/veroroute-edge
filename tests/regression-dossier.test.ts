@@ -284,6 +284,60 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
     expect(prodSnapshot.customModels["antigravity"].length).toBe(6);
     expect(prodSnapshot.customModels["openrouter"]).toBeDefined();
   });
+
+  // -------------------------------------------------------------------------
+  // Fase 6: Impedir Recorrência de Duplicatas (API e UI)
+  // -------------------------------------------------------------------------
+  it("Fase 6: POST /api/admin/providers mescla no provedor embutido em vez de duplicar", async () => {
+    const { adminRouter } = await import("@/admin/routes");
+    const res = await adminRouter.request("/providers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer admin",
+      },
+      body: JSON.stringify({
+        id: "groq-lpu-ultra-fast-inference",
+        name: "Groq LPU (Ultra-Fast Inference)",
+        baseUrl: "https://api.groq.com/openai/v1",
+        apiKeys: ["gsk-test-key-prevent-dup"],
+      }),
+    }, {
+      AUTH_TOKEN: "admin",
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.mergedIntoBuiltin).toBe(true);
+    expect(data.id).toBe("groq");
+  });
+
+  it("Fase 6: POST /api/admin/providers/:id/models ignora modelos que já constam no catálogo estático", async () => {
+    const { adminRouter } = await import("@/admin/routes");
+    const res = await adminRouter.request("/providers/cloudflare-ai/models", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer admin",
+      },
+      body: JSON.stringify({
+        models: [
+          "@cf/meta/llama-3.3-70b-instruct-fp8-fast", // Já existe no catálogo estático!
+          "@cf/modelo-completamente-inedito-2026",    // Modelo novo!
+        ],
+      }),
+    }, {
+      AUTH_TOKEN: "admin",
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.models).toEqual(["@cf/modelo-completamente-inedito-2026"]);
+    expect(data.ignoredStaticModelsCount).toBe(1);
+  });
 });
+
 
 

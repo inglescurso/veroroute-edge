@@ -178,8 +178,51 @@ adminRouter.post("/providers", async (c) => {
   if (!name || !baseUrl) {
     return c.json({ error: { message: "name e baseUrl são obrigatórios", type: "validation" } }, 400);
   }
-  const id = body.id?.trim() ? slugifyProviderId(body.id.trim()) : slugifyProviderId(name);
+  const rawId = body.id?.trim() ? slugifyProviderId(body.id.trim()) : slugifyProviderId(name);
+  const id = normalizeProviderId(rawId);
   const apiKeys = (body.apiKeys || []).map((k) => k.trim()).filter(Boolean);
+
+  // Falha 5 FIX: se o ID já é um provedor nativo, mesclar sem duplicar em customProviders
+  if (PROVIDER_REGISTRY[id]) {
+    if (apiKeys.length) {
+      await appendProviderKeys(c.env, id, apiKeys);
+    }
+    const cfg = await mutateAdminConfig(c.env, (cfg) => {
+      // Se body trouxe novos modelos, mesclar em customModels apenas se não estiverem no catálogo estático
+      if (body.models && Array.isArray(body.models)) {
+        const staticCatalog = new Set([
+          ...(getStaticCatalog(id) || []),
+          ...(PROVIDER_REGISTRY[id]?.models || []),
+        ]);
+        const genuinelyNew = body.models.map((m) => m.trim()).filter((m) => m && !staticCatalog.has(m));
+        if (genuinelyNew.length > 0) {
+          cfg.customModels[id] = Array.from(new Set([...(cfg.customModels[id] || []), ...genuinelyNew]));
+        }
+      }
+      if (baseUrl && baseUrl !== PROVIDER_REGISTRY[id].baseUrl) {
+        if (!cfg.providerBaseUrls) cfg.providerBaseUrls = {};
+        cfg.providerBaseUrls[id] = baseUrl;
+      }
+      // Garantir que não exista como customProvider duplicado
+      if (cfg.customProviders[id]) delete cfg.customProviders[id];
+      if (cfg.customProviders[rawId]) delete cfg.customProviders[rawId];
+    });
+    return c.json({
+      ok: true,
+      id,
+      mergedIntoBuiltin: true,
+      message: `Provedor "${id}" já existe nativamente. Credenciais e configurações foram mescladas sem duplicação.`,
+      provider: {
+        id,
+        name: PROVIDER_REGISTRY[id].name,
+        baseUrl: cfg.providerBaseUrls?.[id] || PROVIDER_REGISTRY[id].baseUrl,
+        apiKeys: apiKeys.map(maskSecret),
+        models: [...(PROVIDER_REGISTRY[id].models || []), ...(cfg.customModels[id] || [])],
+      },
+    });
+  }
+
+  // Provedor verdadeiramente novo/customizado
   const cfg = await mutateAdminConfig(c.env, (cfg) => {
     cfg.customProviders[id] = {
       id, name, baseUrl,
@@ -239,26 +282,36 @@ adminRouter.delete("/providers/:id/keys", async (c) => {
 adminRouter.post("/providers/:id/models", async (c) => {
   const id = normalizeProviderId(c.req.param("id"));
   const body = (await c.req.json()) as { model?: string; models?: string[] };
-  const modelsToAdd = (body.models && Array.isArray(body.models) ? body.models : [body.model])
+  const rawModelsToAdd = (body.models && Array.isArray(body.models) ? body.models : [body.model])
     .map((m) => m?.trim())
     .filter((m): m is string => Boolean(m));
-  if (modelsToAdd.length === 0) {
+  if (rawModelsToAdd.length === 0) {
     return c.json({ error: { message: "Nome do modelo é obrigatório", type: "validation" } }, 400);
   }
+
+  // Falha 6 FIX: filtrar modelos que já existem nativamente no catálogo do provedor
+  const staticModels = new Set([
+    ...(getStaticCatalog(id) || []),
+    ...(PROVIDER_REGISTRY[id]?.models || []),
+  ]);
+  const modelsToAdd = rawModelsToAdd.filter((m) => !staticModels.has(m));
+
   const cfg = await mutateAdminConfig(c.env, (cfg) => {
     if (!cfg.removedModels) cfg.removedModels = {};
     if (cfg.removedModels[id]) {
-      cfg.removedModels[id] = cfg.removedModels[id].filter((m) => !modelsToAdd.includes(m));
+      cfg.removedModels[id] = cfg.removedModels[id].filter((m) => !rawModelsToAdd.includes(m));
     }
-    if (cfg.customProviders[id]) {
-      const list = cfg.customProviders[id].models;
-      for (const model of modelsToAdd) {
-        if (!list.includes(model)) list.push(model);
+    if (modelsToAdd.length > 0) {
+      if (cfg.customProviders[id]) {
+        const list = cfg.customProviders[id].models;
+        for (const model of modelsToAdd) {
+          if (!list.includes(model)) list.push(model);
+        }
+      } else {
+        cfg.customModels[id] = Array.from(new Set([...(cfg.customModels[id] || []), ...modelsToAdd]));
       }
-    } else {
-      cfg.customModels[id] = Array.from(new Set([...(cfg.customModels[id] || []), ...modelsToAdd]));
     }
-    for (const model of modelsToAdd) {
+    for (const model of rawModelsToAdd) {
       const mk = id + "/" + model;
       if (cfg.modelStates[mk]) delete cfg.modelStates[mk];
     }
@@ -267,6 +320,7 @@ adminRouter.post("/providers/:id/models", async (c) => {
     ok: true,
     id,
     models: modelsToAdd,
+    ignoredStaticModelsCount: rawModelsToAdd.length - modelsToAdd.length,
     customModels: cfg.customModels,
     customProviders: cfg.customProviders,
   });

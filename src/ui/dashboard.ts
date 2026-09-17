@@ -2903,24 +2903,33 @@ git push origin master
     async function usePresetAndSearchModels(presetId) {
       const preset = (window._presetsData || []).find(function(x) { return x.id === presetId; });
       if (!preset) return;
-      applyPreset(presetId);
       let provider = (window._providersData || []).find(function(x) { return x.id === preset.id; });
-      if (!provider) {
-        const keyValue = document.getElementById('acp-keys').value.trim();
-        if (!keyValue && preset.id !== 'cloudflare-ai') {
-          showToast('Template aplicado. Informe a chave e clique novamente em Buscar Modelos.', 'info');
-          document.getElementById('acp-keys').focus();
-          return;
-        }
-        await addCustomProvider(preset.id);
-        provider = (window._providersData || []).find(function(x) { return x.id === preset.id; });
+      if (provider) {
+        // Provedor já existe nativamente: abre diretamente o modal de modelos
+        openProviderModelsModal(provider.id);
+        return;
       }
+      applyPreset(presetId);
+      const keyValue = document.getElementById('acp-keys').value.trim();
+      if (!keyValue && preset.id !== 'cloudflare-ai') {
+        showToast('Template aplicado. Informe a chave e clique novamente em Buscar Modelos.', 'info');
+        document.getElementById('acp-keys').focus();
+        return;
+      }
+      await addCustomProvider(preset.id);
+      provider = (window._providersData || []).find(function(x) { return x.id === preset.id; });
       if (provider) openProviderModelsModal(provider.id);
     }
 
     function applyPreset(presetId) {
       const p = (window._presetsData || []).find(function(x) { return x.id === presetId; });
       if (!p) return;
+      const existing = (window._providersData || []).find(function(x) { return x.id === p.id; });
+      if (existing) {
+        showToast('Provedor "' + p.name + '" já está configurado na sua lista. Abrindo chaves...', 'info');
+        openProviderKeysModal(existing.id);
+        return;
+      }
       document.getElementById('acp-name').value = p.name;
       document.getElementById('acp-protocol').value = p.protocol;
       document.getElementById('acp-baseurl').value = p.baseUrl;
