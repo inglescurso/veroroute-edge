@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { DEFAULT_MODELS_CATALOG } from "./config/constants";
+import { listAllAvailableModels } from "./config/modelRegistry";
 import { formatAnthropicToOpenAI, createOpenAIToAnthropicTransformStream } from "./adapters/anthropic";
 import { applyContextCompression } from "./compression/pipeline";
 import { applyModalityBridge } from "./modality/bridge";
@@ -169,19 +169,20 @@ app.get("/v1/models", async (c) => {
       description: cb.description,
     }));
 
-  const catalogModels = DEFAULT_MODELS_CATALOG.map((m) => ({
-    id: m.id,
+  const activeModels = listAllAvailableModels(adminCfg).map((m) => ({
+    id: m.modelId,
     object: "model",
     created: 1710000000,
-    owned_by: m.owned_by,
+    owned_by: m.owned_by || m.providerId,
     permission: [],
-    root: m.id,
+    root: m.modelId,
     parent: null,
     pricing: m.pricing,
     context_length: m.context_length,
+    capabilities: m.capabilities,
   }));
 
-  return c.json({ object: "list", data: [...comboModels, ...catalogModels] });
+  return c.json({ object: "list", data: [...comboModels, ...activeModels] });
 });
 
 // ---------------------------------------------------------------------------

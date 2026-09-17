@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { resolveCandidates } from "@/routing/cascade";
 import { PROVIDER_REGISTRY } from "@/config/providers";
-import { DEFAULT_MODELS_CATALOG, DEFAULT_COMBOS as DEAD_COMBOS } from "@/config/constants";
+import * as constants from "@/config/constants";
+import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
+import { getStaticCatalog, listAllAvailableModels } from "@/config/modelRegistry";
 import { DEFAULT_COMBOS as LIVE_COMBOS, type AdminConfig } from "@/admin/store";
 import { APP_COMMIT_SHA } from "@/config/version";
 import type { ChatCompletionRequest } from "@/types/openai";
@@ -12,11 +14,11 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
   // -------------------------------------------------------------------------
   it("Falha 1: DEFAULT_MODELS_CATALOG é uma lista estática com modelos mortos", () => {
     // Prova: O catálogo hardcoded lista modelos como cerebras/llama3.3-70b
-    const cerebrasModel = DEFAULT_MODELS_CATALOG.find((m) => m.id === "cerebras/llama3.3-70b");
+    const cerebrasModel = DEFAULT_MODELS_CATALOG.find((m: any) => m.id === "cerebras/llama3.3-70b");
     expect(cerebrasModel).toBeDefined();
     expect(cerebrasModel?.provider).toBe("cerebras");
 
-    const groqModel = DEFAULT_MODELS_CATALOG.find((m) => m.id === "llama-3.3-70b-versatile");
+    const groqModel = DEFAULT_MODELS_CATALOG.find((m: any) => m.id === "llama-3.3-70b-versatile");
     expect(groqModel).toBeDefined();
     expect(groqModel?.provider).toBe("groq");
   });
@@ -107,14 +109,14 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
   // -------------------------------------------------------------------------
   // Falha 11: Código morto identificado no dossiê
   // -------------------------------------------------------------------------
-  it("Falha 11: DEFAULT_COMBOS em constants.ts é uma cópia morta divergente de store.ts", () => {
-    // Documenta que existem dois DEFAULT_COMBOS divergentes
-    expect(DEAD_COMBOS).toBeDefined();
+  it("Falha 11: DEFAULT_COMBOS foi removido de constants.ts e store.ts é a fonte única", () => {
+    // Prova: constants.ts não exporta mais DEFAULT_COMBOS (cópia morta eliminada)
+    expect((constants as any).DEFAULT_COMBOS).toBeUndefined();
+    // A única e canônica fonte de DEFAULT_COMBOS é store.ts
     expect(LIVE_COMBOS).toBeDefined();
-    // A cópia morta em constants.ts tem estrutura diferente ({ name, strategy, targets: [{provider, model}] })
-    // enquanto o store.ts tem ({ id, name, description, strategy, targets: [{provider, model, priority}], enabled })
-    expect(Object.keys(DEAD_COMBOS)).toEqual(Object.keys(LIVE_COMBOS));
-    expect((DEAD_COMBOS as any)["omni-free"].targets[0]).not.toEqual(LIVE_COMBOS["omni-free"].targets[0]);
+    expect(LIVE_COMBOS["omni-free"]).toBeDefined();
+    expect(LIVE_COMBOS["omni-code"]).toBeDefined();
+    expect(LIVE_COMBOS["omni-fast"]).toBeDefined();
   });
 
   // -------------------------------------------------------------------------
@@ -133,5 +135,24 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
     const validAuthTypes = ["bearer", "apikey-header", "query", "oauth", "native-binding"];
     // "anthropic" não é um authType válido em ProviderConfig
     expect(validAuthTypes.includes("anthropic")).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Fase 1: Centralização em modelRegistry.ts
+  // -------------------------------------------------------------------------
+  it("Fase 1: modelRegistry centraliza os catálogos estáticos e lista modelos disponíveis", () => {
+    const cfModels = getStaticCatalog("cloudflare-ai");
+    expect(cfModels.length).toBe(12);
+    expect(cfModels).toContain("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+
+    const agyModels = getStaticCatalog("antigravity");
+    expect(agyModels.length).toBe(12);
+    expect(agyModels).toContain("claude-opus-4-6-thinking");
+
+    const all = listAllAvailableModels();
+    expect(all.length).toBeGreaterThan(0);
+    const gpt4o = all.find((m) => m.modelId === "gpt-4o" && m.providerId === "openai");
+    expect(gpt4o).toBeDefined();
+    expect(gpt4o?.pricing?.input_per_million).toBe(2.5);
   });
 });

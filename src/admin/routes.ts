@@ -24,7 +24,7 @@ import { getAntigravityOAuthCredentials } from "./store";
 import type { EnvBindings } from "@/types/provider";
 import { getUsageSummary } from "@/routing/costTracker";
 import { getCircuitStatus } from "@/routing/circuitBreaker";
-import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
+import { getStaticCatalog } from "@/config/modelRegistry";
 import {
   isOpenAICompatBaseUrl,
   normalizeProviderId,
@@ -297,36 +297,10 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
 
   // Catálogo nativo Cloudflare Workers AI
   if (id === "cloudflare-ai" || baseUrl === "workers-ai") {
-    upstreamModels = [
-      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-      "@cf/meta/llama-3.1-70b-instruct",
-      "@cf/meta/llama-3.1-8b-instruct",
-      "@cf/meta/llama-3-8b-instruct",
-      "@cf/qwen/qwen2.5-coder-32b-instruct",
-      "@cf/qwen/qwen2.5-72b-instruct",
-      "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
-      "@cf/mistral/mistral-7b-instruct-v0.2",
-      "@cf/google/gemma-7b-it",
-      "@cf/google/gemma-2b-it",
-      "@cf/baai/bge-large-en-v1.5",
-      "@cf/baai/bge-small-en-v1.5",
-    ];
+    upstreamModels = getStaticCatalog("cloudflare-ai");
   } else if (id === "antigravity") {
     // Catálogo local de fallback — usado SOMENTE se o RPC upstream falhar.
-    const antigravityCatalog = [
-      "gemini-3.7-flash-high",
-      "gemini-3.7-flash-medium",
-      "gemini-3.7-flash-low",
-      "gemini-3.7-flash-tiered",
-      "gemini-3.6-flash-tiered",
-      "gemini-3.5-flash-lite",
-      "gemini-3.1-pro-high",
-      "gemini-3.1-pro-low",
-      "gemini-3.1-flash-lite",
-      "claude-opus-4-6-thinking",
-      "claude-sonnet-4-6",
-      "gpt-oss-120b-medium",
-    ];
+    const antigravityCatalog = getStaticCatalog("antigravity");
     try {
       const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
       const agyAuth = await getValidAntigravityAccessToken(c.env).catch(() => null);
@@ -355,43 +329,13 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       fetchError = "Antigravity: " + (e?.message || "OAuth não autenticado");
     }
   } else if (id === "1min") {
-    const oneMinCatalog = [
-      "gpt-4o",
-      "gpt-4o-mini",
-      "o1",
-      "o1-mini",
-      "o3-mini",
-      "claude-3-7-sonnet",
-      "claude-3-5-sonnet",
-      "claude-3-5-haiku",
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-pro",
-      "gemini-1.5-flash",
-      "deepseek-chat",
-      "deepseek-reasoner",
-      "llama-3.3-70b-instruct",
-      "mistral-large-2",
-      "qwen-2.5-72b-instruct",
-    ];
+    const oneMinCatalog = getStaticCatalog("1min");
     upstreamModels = oneMinCatalog;
     if (!apiKey) {
       fetchError = "Catálogo oficial 1min.ai disponível. Cadastre uma chave de API para habilitar os testes.";
     }
   } else if (id === "gemini") {
-    const geminiOfficialCatalog = [
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-thinking-preview",
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-pro",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-8b",
-      "text-embedding-004",
-      "aqa",
-    ];
+    const geminiOfficialCatalog = getStaticCatalog("gemini");
     // A Base URL efetiva decide a superfície: nativa (?key=) ou compatível com OpenAI (Bearer).
     const requestedGeminiBaseUrl = stripTrailingSlashes(customBaseUrl || GEMINI_NATIVE_BASE_URL);
     const geminiUsesOpenAICompat = resolveGeminiSurface(requestedGeminiBaseUrl, apiKey) === "openai";
@@ -467,16 +411,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     }
   } else if (id === "azure") {
     const cleanAzure = (baseUrl || "").replace(/\/+$/, "");
-    const azureCatalogPresets = [
-      "gpt-4o",
-      "gpt-4o-mini",
-      "o1",
-      "o3-mini",
-      "gpt-4-turbo",
-      "gpt-35-turbo",
-      "text-embedding-3-small",
-      "text-embedding-3-large",
-    ];
+    const azureCatalogPresets = getStaticCatalog("azure");
     if (cleanAzure && !cleanAzure.includes("https://openai.azure.com")) {
       try {
         const controller = new AbortController();
@@ -506,20 +441,7 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
       fetchError = "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com) no campo Endpoint acima.";
     }
   } else if (id === "bedrock") {
-    const bedrockModels = [
-      "anthropic.claude-3-7-sonnet-20250219-v1:0",
-      "anthropic.claude-3-5-sonnet-20241022-v2:0",
-      "anthropic.claude-3-5-haiku-20241022-v1:0",
-      "anthropic.claude-3-haiku-20240307-v1:0",
-      "meta.llama3-3-70b-instruct-v1:0",
-      "meta.llama3-1-70b-instruct-v1:0",
-      "meta.llama3-1-8b-instruct-v1:0",
-      "amazon.nova-pro-v1:0",
-      "amazon.nova-lite-v1:0",
-      "amazon.nova-micro-v1:0",
-      "mistral.mistral-large-2407-v1:0",
-      "deepseek.r1-v1:0",
-    ];
+    const bedrockModels = getStaticCatalog("bedrock");
     const cleanBedrock = (baseUrl || "").replace(/\/+$/, "");
     if (cleanBedrock && !cleanBedrock.includes("amazonaws.com")) {
       try {
