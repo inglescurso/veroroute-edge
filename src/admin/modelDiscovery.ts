@@ -1,19 +1,25 @@
 /**
- * Descoberta de modelos upstream (model discovery).
+ * Descoberta Unificada de Modelos Upstream (Model Discovery Pipeline)
  *
- * Concentra as rotas de listagem de modelos que o painel usa no botão
- * "Buscar Modelos":
- *  - Google Cloud Code Assist (Antigravity CLI / alias "agy");
- *  - Gemini (AI Studio) na superfície nativa e na camada compatível com OpenAI.
+ * Concentra e padroniza a listagem de modelos para todos os provedores:
+ *  - Provedores com endpoints dinâmicos (OpenAI, OpenRouter, Groq, Cerebras, Pollinations, Antigravity, Gemini);
+ *  - Provedores sem endpoints públicos de listagem (1min, Azure sem endpoint configurado, Bedrock sem proxy)
+ *    declarando explicitamente discoverySupported: false.
  */
 
 import { ANTIGRAVITY_PUBLIC_CONFIG } from "@/config/constants";
+import { getStaticCatalog } from "@/config/modelRegistry";
 import {
   GEMINI_NATIVE_BASE_URL,
   GEMINI_OPENAI_COMPAT_BASE_URL,
+  buildModelsUrl,
   extractModelIds,
+  isOpenAICompatBaseUrl,
+  normalizeProviderId,
+  resolveGeminiSurface,
   stripTrailingSlashes,
 } from "@/config/providerAliases";
+import type { EnvBindings } from "@/types/provider";
 
 export { GEMINI_NATIVE_BASE_URL, GEMINI_OPENAI_COMPAT_BASE_URL };
 
@@ -25,6 +31,17 @@ export interface DiscoveryResult {
   source: "upstream" | "catalog";
   /** Diagnóstico por tentativa (status HTTP / formato da resposta). */
   attempts?: string[];
+  /** Indica explicitamente se o provedor suporta endpoint de descoberta dinâmica. */
+  discoverySupported: boolean;
+}
+
+export interface DiscoverCredentials {
+  apiKey?: string;
+  baseUrl?: string;
+  authType?: string;
+  headerName?: string;
+  protocol?: string;
+  env?: EnvBindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,11 +53,6 @@ const ANTIGRAVITY_DISCOVERY_HOSTS = [
   "https://cloudcode-pa.googleapis.com",
 ];
 
-/**
- * Ordena os modelos priorizando o grupo "Recommended" do agentModelSorts e,
- * em seguida, ordenando os demais alfabeticamente (mesma heurística do
- * language server oficial do Antigravity).
- */
 function orderAntigravityModels(ids: string[], payload: any): string[] {
   const available = new Set(ids);
   const ordered: string[] = [];
@@ -48,8 +60,6 @@ function orderAntigravityModels(ids: string[], payload: any): string[] {
   const push = (id: unknown) => {
     if (typeof id !== "string") return;
     const clean = id.replace(/^models\//, "");
-    // tab_*/chat_* são modelos internos (Tab completion / agrupamentos do
-    // editor) que não respondem em /v1internal:generateContent.
     if (/^(tab_|chat_)/i.test(clean)) return;
     if (available.has(clean) && !ordered.includes(clean)) ordered.push(clean);
   };
@@ -72,10 +82,8 @@ function orderAntigravityModels(ids: string[], payload: any): string[] {
   return ordered;
 }
 
-/** Achata o payload do RPC aceitando { models } ou { response: { models } }. */
 function antigravityPayload(json: any): any {
   if (json && typeof json === "object" && json.response && typeof json.response === "object") {
-    // Usa o envelope interno apenas quando ele realmente traz modelos.
     if (json.response.models || json.response.availableModels || json.response.available_models) {
       return json.response;
     }
@@ -83,21 +91,19 @@ function antigravityPayload(json: any): any {
   return json;
 }
 
-/**
- * Lista os modelos realmente disponíveis para uma conta do Antigravity CLI.
- *
- * Endpoint oficial (RPC POST — NÃO existe rota REST /v1internal:models):
- *   POST https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
- *   body: {"project":"<projectId>"}
- *   resposta: { models: { "<slug>": { displayName, ... } }, agentModelSorts: [...] }
- */
 export async function fetchAntigravityAvailableModels(
   accessToken: string,
   projectId?: string,
   timeoutMs = 8000
 ): Promise<DiscoveryResult> {
   if (!accessToken) {
-    return { models: [], error: "Access token do Antigravity ausente", source: "catalog", attempts: [] };
+    return {
+      models: getStaticCatalog("antigravity"),
+      error: "Access token do Antigravity ausente",
+      source: "catalog",
+      discoverySupported: true,
+      attempts: [],
+    };
   }
 
   const project = (projectId || ANTIGRAVITY_PUBLIC_CONFIG.defaultProjectId || "").trim();
@@ -141,7 +147,6 @@ export async function fetchAntigravityAvailableModels(
       }
 
       const payload = antigravityPayload(json);
-      // extractModelIds já entende { models: { slug: {...} } } e { data: [...] }.
       const raw = extractModelIds(payload);
 
       if (raw.length > 0) {
@@ -149,14 +154,12 @@ export async function fetchAntigravityAvailableModels(
           models: orderAntigravityModels(raw, payload),
           error: null,
           source: "upstream",
+          discoverySupported: true,
           attempts,
         };
       }
 
-      const keys = payload && typeof payload === "object" ? Object.keys(payload).slice(0, 8).join(",") : String(payload);
-      attempts.push(
-        `${shortHost} HTTP 200 sem modelos (chaves=[${keys}], projeto="${project}", corpo=${rawBody.replace(/\s+/g, " ").slice(0, 140)})`
-      );
+      attempts.push(`${shortHost} HTTP 200 sem modelos`);
       lastError = "Cloud Code Assist respondeu sem modelos";
     } catch (err: any) {
       const detail = err?.name === "AbortError" ? `timeout ${timeoutMs}ms` : err?.message || String(err);
@@ -168,31 +171,24 @@ export async function fetchAntigravityAvailableModels(
   }
 
   return {
-    models: [],
-    error: lastError || "Falha desconhecida na descoberta Antigravity",
+    models: getStaticCatalog("antigravity"),
+    error: lastError || "Falha na descoberta Antigravity",
     source: "catalog",
+    discoverySupported: true,
     attempts,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Gemini (AI Studio) — camada compatível com OpenAI
+// Gemini (AI Studio) — OpenAI Compat & Nativo
 // ---------------------------------------------------------------------------
 
-/**
- * Lista modelos pela superfície compatível com OpenAI do Google:
- *   GET {base}/models  +  Authorization: Bearer <API_KEY>
- *
- * Necessário para a Base URL "https://generativelanguage.googleapis.com/v1beta/openai/"
- * e para as chaves novas do AI Studio (formato "AQ...."), que não funcionam
- * no parâmetro ?key= da API nativa.
- */
 export async function fetchGeminiOpenAICompatModels(
   baseUrl: string,
   apiKey: string,
   timeoutMs = 8000
 ): Promise<DiscoveryResult> {
-  const url = stripTrailingSlashes(baseUrl || GEMINI_OPENAI_COMPAT_BASE_URL) + "/models";
+  const url = buildModelsUrl(baseUrl || GEMINI_OPENAI_COMPAT_BASE_URL);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -207,9 +203,10 @@ export async function fetchGeminiOpenAICompatModels(
     if (!res.ok) {
       const errJson: any = await res.json().catch(() => ({}));
       return {
-        models: [],
+        models: getStaticCatalog("gemini"),
         error: errJson?.error?.message || `Google OpenAI-compat HTTP ${res.status}`,
         source: "catalog",
+        discoverySupported: true,
         attempts: [`${url} HTTP ${res.status}`],
       };
     }
@@ -217,22 +214,309 @@ export async function fetchGeminiOpenAICompatModels(
     const json: any = await res.json().catch(() => ({}));
     const models = extractModelIds(json);
     return {
-      models,
+      models: models.length > 0 ? models : getStaticCatalog("gemini"),
       error: models.length > 0 ? null : "Resposta da camada OpenAI-compat sem modelos",
       source: models.length > 0 ? "upstream" : "catalog",
+      discoverySupported: true,
       attempts: [`${url} HTTP ${res.status} (${models.length} modelos)`],
     };
   } catch (err: any) {
     return {
-      models: [],
-      error:
-        err?.name === "AbortError"
-          ? `Timeout ao consultar ${url} (${timeoutMs}ms)`
-          : err?.message || String(err),
+      models: getStaticCatalog("gemini"),
+      error: err?.name === "AbortError" ? `Timeout ao consultar ${url} (${timeoutMs}ms)` : err?.message || String(err),
       source: "catalog",
+      discoverySupported: true,
       attempts: [`${url} falhou`],
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline Centralizado: discoverModels
+// ---------------------------------------------------------------------------
+
+export async function discoverModels(
+  providerId: string,
+  credentials: DiscoverCredentials = {},
+  timeoutMs = 8000
+): Promise<DiscoveryResult> {
+  const id = normalizeProviderId(providerId);
+  const apiKey = credentials.apiKey?.trim() || "";
+  const baseUrl = stripTrailingSlashes(credentials.baseUrl || "");
+
+  // 1. Provedores sem suporte a listagem dinâmica upstream
+  if (id === "1min") {
+    return {
+      models: getStaticCatalog("1min"),
+      error: null,
+      source: "catalog",
+      discoverySupported: false,
+      attempts: ["1min.ai não possui endpoint de listagem (/models). Catálogo estático utilizado."],
+    };
+  }
+
+  if (id === "cloudflare-ai" || baseUrl === "workers-ai") {
+    return {
+      models: getStaticCatalog("cloudflare-ai"),
+      error: null,
+      source: "catalog",
+      discoverySupported: false,
+      attempts: ["Cloudflare Workers AI opera via modelos nativos do binding env.AI."],
+    };
+  }
+
+  if (id === "azure" && (!baseUrl || baseUrl.includes("https://openai.azure.com"))) {
+    return {
+      models: getStaticCatalog("azure"),
+      error: "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com) no campo Endpoint.",
+      source: "catalog",
+      discoverySupported: false,
+      attempts: ["Azure sem endpoint customizado configurado."],
+    };
+  }
+
+  if (id === "bedrock" && (!baseUrl || baseUrl.includes("amazonaws.com"))) {
+    return {
+      models: getStaticCatalog("bedrock"),
+      error: apiKey ? null : "AWS Bedrock: Catálogo de Foundation Models disponível. Configure endpoint de proxy para testes.",
+      source: "catalog",
+      discoverySupported: false,
+      attempts: ["AWS Bedrock requer proxy ou SigV4 para consulta dinâmica."],
+    };
+  }
+
+  // 2. Google Cloud Code Assist (Antigravity)
+  if (id === "antigravity") {
+    let accessToken = apiKey;
+    let projectId = "";
+    if (!accessToken && credentials.env) {
+      try {
+        const { getValidAntigravityAccessToken, discoverCompanionProject } = await import("@/oauth/antigravity");
+        const agyAuth = await getValidAntigravityAccessToken(credentials.env).catch(() => null);
+        if (agyAuth?.accessToken) {
+          accessToken = agyAuth.accessToken;
+          projectId = agyAuth.projectId || "";
+          if (!projectId) {
+            projectId = await discoverCompanionProject(accessToken).catch(() => "");
+          }
+        }
+      } catch {}
+    }
+
+    if (!accessToken) {
+      return {
+        models: getStaticCatalog("antigravity"),
+        error: "Antigravity: Login OAuth pendente. Para conectar sua conta Google, use a aba Antigravity OAuth.",
+        source: "catalog",
+        discoverySupported: true,
+        attempts: ["Nenhum token OAuth ativo encontrado"],
+      };
+    }
+
+    return fetchAntigravityAvailableModels(accessToken, projectId, timeoutMs);
+  }
+
+  // 3. Google Gemini (AI Studio)
+  if (id === "gemini") {
+    const requestedGeminiBaseUrl = baseUrl || GEMINI_NATIVE_BASE_URL;
+    const geminiUsesOpenAICompat = resolveGeminiSurface(requestedGeminiBaseUrl, apiKey) === "openai";
+    const effectiveBaseUrl = geminiUsesOpenAICompat && !/\/openai(?:\/v\d+)?$/i.test(requestedGeminiBaseUrl)
+      ? GEMINI_OPENAI_COMPAT_BASE_URL
+      : requestedGeminiBaseUrl;
+
+    if (apiKey && geminiUsesOpenAICompat) {
+      return fetchGeminiOpenAICompatModels(effectiveBaseUrl, apiKey, timeoutMs);
+    }
+
+    if (apiKey) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(`${effectiveBaseUrl}/models?key=${encodeURIComponent(apiKey)}`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const json: any = await res.json().catch(() => ({}));
+          const models = extractModelIds(json);
+          if (models.length > 0) {
+            return {
+              models,
+              error: null,
+              source: "upstream",
+              discoverySupported: true,
+            };
+          }
+        }
+      } catch {}
+
+      // Fallback para superfície OpenAI-compat
+      return fetchGeminiOpenAICompatModels(GEMINI_OPENAI_COMPAT_BASE_URL, apiKey, timeoutMs);
+    }
+
+    return {
+      models: getStaticCatalog("gemini"),
+      error: "Catálogo oficial Gemini disponível. Digite sua chave de API para sincronizar modelos personalizados.",
+      source: "catalog",
+      discoverySupported: true,
+    };
+  }
+
+  // 4. Pollinations.ai (Keyless)
+  if (id === "pollinations") {
+    const url = "https://gen.pollinations.ai/models";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+      clearTimeout(timer);
+
+      if (res.status === 429) {
+        return {
+          models: getStaticCatalog("pollinations"),
+          error: "Pollinations: Limite de fila por IP compartilhado da Cloudflare atingido (429). Aguarde alguns instantes para retestar.",
+          source: "catalog",
+          discoverySupported: true,
+          attempts: [`${url} HTTP 429 (Egress rate-limit Cloudflare)`],
+        };
+      }
+
+      if (res.ok) {
+        const json: any = await res.json().catch(() => []);
+        const models = extractModelIds(json);
+        if (models.length > 0) {
+          return {
+            models,
+            error: null,
+            source: "upstream",
+            discoverySupported: true,
+          };
+        }
+      }
+
+      return {
+        models: getStaticCatalog("pollinations"),
+        error: `Pollinations HTTP ${res.status}`,
+        source: "catalog",
+        discoverySupported: true,
+      };
+    } catch (err: any) {
+      clearTimeout(timer);
+      return {
+        models: getStaticCatalog("pollinations"),
+        error: err?.name === "AbortError" ? "Timeout ao consultar Pollinations (8s)" : (err?.message || String(err)),
+        source: "catalog",
+        discoverySupported: true,
+      };
+    }
+  }
+
+  // 5. OpenRouter
+  if (id === "openrouter" || id === "openrouter-free") {
+    const url = "https://openrouter.ai/api/v1/models";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+    try {
+      const res = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const json: any = await res.json().catch(() => ({}));
+        let models = extractModelIds(json);
+        if (id === "openrouter-free") {
+          const free = models.filter((m) => m.endsWith(":free"));
+          if (free.length > 0) models = free;
+        }
+        if (models.length > 0) {
+          return {
+            models,
+            error: null,
+            source: "upstream",
+            discoverySupported: true,
+          };
+        }
+      }
+      return {
+        models: getStaticCatalog("openrouter"),
+        error: `OpenRouter HTTP ${res.status}`,
+        source: "catalog",
+        discoverySupported: true,
+      };
+    } catch (err: any) {
+      clearTimeout(timer);
+      return {
+        models: getStaticCatalog("openrouter"),
+        error: err?.name === "AbortError" ? "Timeout ao consultar OpenRouter (8s)" : (err?.message || String(err)),
+        source: "catalog",
+        discoverySupported: true,
+      };
+    }
+  }
+
+  // 6. Generic OpenAI-compatible / Anthropic / Custom Base URL
+  if (baseUrl) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const url = buildModelsUrl(baseUrl);
+    const headers: Record<string, string> = { Accept: "application/json" };
+
+    if (credentials.authType === "anthropic" || credentials.protocol === "anthropic") {
+      headers["x-api-key"] = apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+    } else if (credentials.authType === "apikey-header") {
+      headers[credentials.headerName || "api-key"] = apiKey;
+    } else if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    try {
+      const res = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const json: any = await res.json().catch(() => ({}));
+        const models = extractModelIds(json);
+        if (models.length > 0) {
+          return {
+            models,
+            error: null,
+            source: "upstream",
+            discoverySupported: true,
+          };
+        }
+        return {
+          models: getStaticCatalog(id),
+          error: "Upstream respondeu sem modelos",
+          source: "catalog",
+          discoverySupported: true,
+        };
+      }
+      return {
+        models: getStaticCatalog(id),
+        error: `Upstream HTTP ${res.status}`,
+        source: "catalog",
+        discoverySupported: true,
+      };
+    } catch (err: any) {
+      clearTimeout(timer);
+      return {
+        models: getStaticCatalog(id),
+        error: err?.name === "AbortError" ? "Timeout ao consultar upstream (8s)" : (err?.message || String(err)),
+        source: "catalog",
+        discoverySupported: true,
+      };
+    }
+  }
+
+  // 7. Fallback catálogo estático padrão
+  return {
+    models: getStaticCatalog(id),
+    error: apiKey ? "Nenhum endpoint de descoberta disponível para este provedor" : "Cadastre uma chave de API para habilitar testes e sincronização",
+    source: "catalog",
+    discoverySupported: false,
+  };
 }

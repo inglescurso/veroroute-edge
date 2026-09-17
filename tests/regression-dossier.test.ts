@@ -4,6 +4,7 @@ import { PROVIDER_REGISTRY } from "@/config/providers";
 import * as constants from "@/config/constants";
 import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
 import { getStaticCatalog, listAllAvailableModels } from "@/config/modelRegistry";
+import { discoverModels } from "@/admin/modelDiscovery";
 import { DEFAULT_COMBOS as LIVE_COMBOS, type AdminConfig } from "@/admin/store";
 import { APP_COMMIT_SHA } from "@/config/version";
 import type { ChatCompletionRequest } from "@/types/openai";
@@ -92,13 +93,26 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
   });
 
   // -------------------------------------------------------------------------
-  // Falha 7: Descoberta e execução discordam no Pollinations (host legado no baseUrl)
+  // Falha 7 (Corrigida na Fase 3): Pollinations aponta para gen.pollinations.ai/v1
   // -------------------------------------------------------------------------
-  it("Falha 7: PROVIDER_REGISTRY.pollinations usa host legado text.pollinations.ai", () => {
+  it("Falha 7: PROVIDER_REGISTRY.pollinations usa host oficial gen.pollinations.ai/v1", () => {
     const pollinations = PROVIDER_REGISTRY["pollinations"];
     expect(pollinations).toBeDefined();
-    // Documenta a falha atual: aponta para text.pollinations.ai em vez de gen.pollinations.ai/v1
-    expect(pollinations.baseUrl).toBe("https://text.pollinations.ai/openai");
+    expect(pollinations.baseUrl).toBe("https://gen.pollinations.ai/v1");
+  });
+
+  // -------------------------------------------------------------------------
+  // Fase 3: discoverModels unificado e discoverySupported explícito
+  // -------------------------------------------------------------------------
+  it("Fase 3: discoverModels declara discoverySupported: false para 1min e cloudflare-ai", async () => {
+    const oneMinRes = await discoverModels("1min");
+    expect(oneMinRes.discoverySupported).toBe(false);
+    expect(oneMinRes.models.length).toBeGreaterThan(0);
+    expect(oneMinRes.source).toBe("catalog");
+
+    const cfRes = await discoverModels("cloudflare-ai");
+    expect(cfRes.discoverySupported).toBe(false);
+    expect(cfRes.models.length).toBe(12);
   });
 
   // -------------------------------------------------------------------------

@@ -32,6 +32,7 @@ import {
   stripTrailingSlashes,
 } from "@/config/providerAliases";
 import {
+  discoverModels,
   fetchAntigravityAvailableModels,
   fetchGeminiOpenAICompatModels,
   GEMINI_NATIVE_BASE_URL,
@@ -288,261 +289,24 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
   // Prioriza baseUrl enviado no body, depois customizado no KV, depois env var, depois default do provedor
   const customBaseUrl = body.baseUrl?.trim() || cfg.providerBaseUrls?.[id] || (id === "azure" ? c.env.AZURE_OPENAI_ENDPOINT : undefined);
   const baseUrl = customBaseUrl || prov?.baseUrl || preset?.baseUrl || "";
-  const authType = (prov && "authType" in prov ? prov.authType : undefined) || "bearer";
+  const authType: string = (prov && "authType" in prov && typeof (prov as any).authType === "string" ? (prov as any).authType : undefined) || "bearer";
   const headerName: string = (prov && "headerName" in prov && typeof (prov as any).headerName === "string" ? (prov as any).headerName : "api-key");
+  const protocol = (prov as any)?.protocol;
 
-  let upstreamModels: string[] = [];
-  let fetchError: string | null = null;
-  let upstreamFromApi = false;
+  const discovery = await discoverModels(id, {
+    apiKey,
+    baseUrl,
+    authType,
+    headerName,
+    protocol,
+    env: c.env,
+  });
 
-  // Catálogo nativo Cloudflare Workers AI
-  if (id === "cloudflare-ai" || baseUrl === "workers-ai") {
-    upstreamModels = getStaticCatalog("cloudflare-ai");
-  } else if (id === "antigravity") {
-    // Catálogo local de fallback — usado SOMENTE se o RPC upstream falhar.
-    const antigravityCatalog = getStaticCatalog("antigravity");
-    try {
-      const { getValidAntigravityAccessToken } = await import("@/oauth/antigravity");
-      const agyAuth = await getValidAntigravityAccessToken(c.env).catch(() => null);
-      if (agyAuth?.accessToken) {
-        // RPC oficial: POST /v1internal:fetchAvailableModels (Cloud Code Assist).
-        let projectId = agyAuth.projectId || "";
-        if (!projectId) {
-          const { discoverCompanionProject } = await import("@/oauth/antigravity");
-          projectId = await discoverCompanionProject(agyAuth.accessToken).catch(() => "");
-        }
-        const discovery = await fetchAntigravityAvailableModels(agyAuth.accessToken, projectId);
-        if (discovery.models.length > 0) {
-          upstreamModels = discovery.models;
-          upstreamFromApi = true;
-        } else {
-          upstreamModels = antigravityCatalog;
-          const detail = discovery.attempts?.length ? " [" + discovery.attempts.join(" | ") + "]" : "";
-          fetchError = "Antigravity: " + (discovery.error || "Cloud Code Assist não retornou modelos") + detail;
-        }
-      } else {
-        upstreamModels = antigravityCatalog;
-        fetchError = "Antigravity: Login OAuth pendente. Para conectar sua conta Google, use a aba Antigravity OAuth.";
-      }
-    } catch (e: any) {
-      upstreamModels = antigravityCatalog;
-      fetchError = "Antigravity: " + (e?.message || "OAuth não autenticado");
-    }
-  } else if (id === "1min") {
-    const oneMinCatalog = getStaticCatalog("1min");
-    upstreamModels = oneMinCatalog;
-    if (!apiKey) {
-      fetchError = "Catálogo oficial 1min.ai disponível. Cadastre uma chave de API para habilitar os testes.";
-    }
-  } else if (id === "gemini") {
-    const geminiOfficialCatalog = getStaticCatalog("gemini");
-    // A Base URL efetiva decide a superfície: nativa (?key=) ou compatível com OpenAI (Bearer).
-    const requestedGeminiBaseUrl = stripTrailingSlashes(customBaseUrl || GEMINI_NATIVE_BASE_URL);
-    const geminiUsesOpenAICompat = resolveGeminiSurface(requestedGeminiBaseUrl, apiKey) === "openai";
-    // Uma chave AQ. configurada com a base nativa ainda pertence à superfície
-    // OpenAI-compat do AI Studio. Troca apenas a superfície, não a credencial.
-    const geminiBaseUrl = geminiUsesOpenAICompat && !/\/openai(?:\/v\d+)?$/i.test(requestedGeminiBaseUrl)
-      ? GEMINI_OPENAI_COMPAT_BASE_URL
-      : requestedGeminiBaseUrl;
+  const upstreamModels = discovery.models;
+  const upstreamFromApi = discovery.source === "upstream";
+  const fetchError = discovery.error;
 
-    if (apiKey && geminiUsesOpenAICompat) {
-      // Base URL "https://generativelanguage.googleapis.com/v1beta/openai/"
-      const discovery = await fetchGeminiOpenAICompatModels(geminiBaseUrl, apiKey);
-      if (discovery.models.length > 0) {
-        upstreamModels = discovery.models;
-        upstreamFromApi = true;
-      } else {
-        upstreamModels = geminiOfficialCatalog;
-        fetchError = discovery.error || "Gemini (OpenAI-compat): nenhum modelo retornado";
-      }
-    } else if (apiKey) {
-      let lastError: string | null = null;
-      const attempts: Array<{ url: string; headers: Record<string, string> }> = [
-        { url: `${geminiBaseUrl}/models?key=${encodeURIComponent(apiKey)}`, headers: { Accept: "application/json" } },
-        { url: `${geminiBaseUrl}/models`, headers: { Accept: "application/json", "x-goog-api-key": apiKey } },
-      ];
-
-      for (const attempt of attempts) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        try {
-          const res = await fetch(attempt.url, { headers: attempt.headers, signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (!res.ok) {
-            const errJson = (await res.json().catch(() => ({}))) as any;
-            lastError = errJson.error?.message || `Google API HTTP ${res.status}`;
-            continue;
-          }
-          const json = (await res.json()) as any;
-          const fetched = (Array.isArray(json.models) ? json.models : [])
-            .filter((m: any) => {
-              const methods = m.supportedGenerationMethods || [];
-              return methods.length === 0 || methods.includes("generateContent") || methods.includes("generateAnswer");
-            })
-            .map((m: any) => (m.name || "").replace(/^models\//, ""))
-            .filter(Boolean);
-          if (fetched.length > 0) {
-            upstreamModels = fetched;
-            upstreamFromApi = true;
-            lastError = null;
-            break;
-          }
-          lastError = "Google API respondeu sem modelos";
-        } catch (err: any) {
-          clearTimeout(timeoutId);
-          lastError = err.name === "AbortError" ? "Timeout ao consultar Google Gemini (8s)" : (err.message || String(err));
-        }
-      }
-
-      // Chaves novas do AI Studio (formato "AQ....") só respondem na camada OpenAI-compat.
-      if (!upstreamFromApi) {
-        const compat = await fetchGeminiOpenAICompatModels(GEMINI_OPENAI_COMPAT_BASE_URL, apiKey);
-        if (compat.models.length > 0) {
-          upstreamModels = compat.models;
-          upstreamFromApi = true;
-        } else {
-          upstreamModels = geminiOfficialCatalog;
-          fetchError = lastError || compat.error;
-        }
-      }
-    } else {
-      upstreamModels = geminiOfficialCatalog;
-      fetchError = "Catálogo oficial Gemini disponível. Digite sua chave de API para sincronizar modelos personalizados.";
-    }
-  } else if (id === "azure") {
-    const cleanAzure = (baseUrl || "").replace(/\/+$/, "");
-    const azureCatalogPresets = getStaticCatalog("azure");
-    if (cleanAzure && !cleanAzure.includes("https://openai.azure.com")) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        let url = `${cleanAzure}/openai/deployments?api-version=2024-02-15-preview`;
-        let res = await fetch(url, { headers: { Accept: "application/json", "api-key": apiKey }, signal: controller.signal });
-        if (!res.ok) {
-          url = `${cleanAzure}/openai/models?api-version=2024-02-15-preview`;
-          res = await fetch(url, { headers: { Accept: "application/json", "api-key": apiKey }, signal: controller.signal });
-        }
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const json = (await res.json()) as any;
-          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-          const extracted = list.map((m: any) => m.id || m.name || m.model).filter(Boolean);
-          upstreamModels = extracted.length > 0 ? extracted : azureCatalogPresets;
-        } else {
-          fetchError = `Azure HTTP ${res.status}: verifique a chave e o endpoint`;
-          upstreamModels = azureCatalogPresets;
-        }
-      } catch (err: any) {
-        fetchError = err.name === "AbortError" ? "Timeout ao consultar Azure (8s)" : (err.message || String(err));
-        upstreamModels = azureCatalogPresets;
-      }
-    } else {
-      upstreamModels = azureCatalogPresets;
-      fetchError = "Azure: Configure a URL do seu recurso Azure (ex: https://seu-recurso.openai.azure.com) no campo Endpoint acima.";
-    }
-  } else if (id === "bedrock") {
-    const bedrockModels = getStaticCatalog("bedrock");
-    const cleanBedrock = (baseUrl || "").replace(/\/+$/, "");
-    if (cleanBedrock && !cleanBedrock.includes("amazonaws.com")) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const url = cleanBedrock.endsWith("/models") ? cleanBedrock : (cleanBedrock.endsWith("/v1") ? `${cleanBedrock}/models` : `${cleanBedrock}/v1/models`);
-        const res = await fetch(url, {
-          headers: {
-            Accept: "application/json",
-            Authorization: apiKey ? (apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`) : "",
-          },
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const json = (await res.json()) as any;
-          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.models) ? json.models : (Array.isArray(json) ? json : []));
-          const extracted = list.map((m: any) => typeof m === "string" ? m : (m.id || m.name || m.model)).filter(Boolean);
-          upstreamModels = extracted.length > 0 ? extracted : bedrockModels;
-        } else {
-          upstreamModels = bedrockModels;
-        }
-      } catch {
-        upstreamModels = bedrockModels;
-      }
-    } else {
-      upstreamModels = bedrockModels;
-      if (!apiKey) {
-        fetchError = "AWS Bedrock: Catálogo de Foundation Models disponível. Configure endpoint de proxy ou credenciais para testes.";
-      }
-    }
-  } else if (baseUrl) {
-    // Consulta à API oficial upstream para outros provedores OpenAI / Anthropic
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const cleanBaseUrl = stripTrailingSlashes(baseUrl);
-      let url = cleanBaseUrl + "/models";
-      const headers: Record<string, string> = {
-        Accept: "application/json",
-      };
-
-      if (id === "pollinations") {
-        url = "https://gen.pollinations.ai/models";
-      } else if (id === "openrouter" || id === "openrouter-free") {
-        url = "https://openrouter.ai/api/v1/models";
-        if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-      } else if (authType === "anthropic" || (prov && "protocol" in prov && prov.protocol === "anthropic")) {
-        headers["x-api-key"] = apiKey || "";
-        headers["anthropic-version"] = "2023-06-01";
-      } else if (authType === "apikey-header") {
-        headers[headerName || "api-key"] = apiKey || "";
-      } else {
-        if (/\/models$/.test(cleanBaseUrl)) {
-          // A Base URL já aponta para o endpoint de listagem.
-          url = cleanBaseUrl;
-        } else if (isOpenAICompatBaseUrl(cleanBaseUrl) || /\/v\d+$/.test(cleanBaseUrl)) {
-          // Ex.: .../v1beta/openai  ->  .../v1beta/openai/models  (sem injetar /v1)
-          url = cleanBaseUrl + "/models";
-        } else if (prov?.protocol === "openai" || id === "cheaperinference") {
-          url = cleanBaseUrl + "/v1/models";
-        } else {
-          url = cleanBaseUrl + "/models";
-        }
-        if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-
-      const res = await fetch(url, { headers, signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const json = (await res.json()) as any;
-        const list = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : (Array.isArray(json.models) ? json.models : []));
-        let extracted = list
-          .map((m: any) => (typeof m === "string" ? m : (m.id || m.name)))
-          .filter((m: any): m is string => Boolean(m))
-          // O id e preservado exatamente como o upstream devolve: provedores como
-          // a Groq exigem o namespace ("openai/gpt-oss-120b") e recusam a forma curta.
-          .map((m: string) => m.replace(/^models\//, ""));
-
-        if (id === "openrouter-free") {
-          const freeOnly = extracted.filter((m: string) => m.endsWith(":free"));
-          extracted = freeOnly.length > 0 ? freeOnly : extracted;
-        }
-
-        if (extracted.length > 0) {
-          upstreamModels = extracted;
-          upstreamFromApi = true;
-        } else {
-          fetchError = "Upstream respondeu sem modelos";
-        }
-      } else {
-        fetchError = `Upstream HTTP ${res.status}`;
-      }
-    } catch (err: any) {
-      fetchError = err.name === "AbortError" ? "Timeout ao consultar upstream (8s)" : (err.message || String(err));
-    }
-  }
-
-  // 2. Combinar com catálogo conhecido do provedor e modelos ativos
+  // Combinar com catálogo conhecido do provedor e modelos ativos
   const activeCustomModels = cfg.customModels[id] || [];
   const registryModels = prov?.models || [];
   const removedModels = cfg.removedModels?.[id] || [];
@@ -561,7 +325,8 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
     models: allAvailable,
     upstreamCount: upstreamModels.length,
     hasUpstream: upstreamFromApi,
-    source: upstreamFromApi ? "upstream" : "catalog",
+    discoverySupported: discovery.discoverySupported,
+    source: discovery.source,
     fetchError,
     activeModels: Array.from(new Set([...registryModels, ...activeCustomModels])).filter((m) => !removedModels.includes(m)),
   });

@@ -180,7 +180,7 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
   pollinations: {
     id: "pollinations",
     name: "Pollinations.ai (Ilimitado / Keyless)",
-    baseUrl: "https://text.pollinations.ai/openai",
+    baseUrl: "https://gen.pollinations.ai/v1",
     authType: "bearer",
     // Alias gratuito atual e modelos de texto retornados pelo catalogo oficial.
     models: ["openai", "deepseek/deepseek-v4.1-flash", "qwen/qwen3.8-flash", "openai/gpt-oss-20b"],
