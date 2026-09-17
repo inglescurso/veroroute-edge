@@ -160,8 +160,23 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
 
     const all = listAllAvailableModels();
     expect(all.length).toBeGreaterThan(0);
-    const gpt4o = all.find((m) => m.modelId === "gpt-4o" && m.providerId === "openai");
+    const gpt4o = all.find((m: any) => m.modelId === "gpt-4o" && m.providerId === "openai");
     expect(gpt4o).toBeDefined();
     expect(gpt4o?.pricing?.input_per_million).toBe(2.5);
   });
+
+  // -------------------------------------------------------------------------
+  // Fase 4: Classificação de erros e teste honesto de modelos (Falha 8)
+  // -------------------------------------------------------------------------
+  it("Fase 4: classifyError categoriza precisamente os erros de chamada de modelo", async () => {
+    const { classifyError } = await import("@/admin/routes");
+    expect(classifyError(200, "")).toBe("ok");
+    expect(classifyError(404, "The model 'foo' does not exist")).toBe("modelo_inexistente");
+    expect(classifyError(401, "Incorrect API key provided")).toBe("sem_acesso");
+    expect(classifyError(429, "Rate limit reached for requests")).toBe("cota_esgotada");
+    expect(classifyError(402, "Insufficient balance / credits")).toBe("precisa_pago");
+    expect(classifyError(504, "Gateway timeout")).toBe("timeout");
+    expect(classifyError(500, "Internal error")).toBe("outro_erro");
+  });
 });
+

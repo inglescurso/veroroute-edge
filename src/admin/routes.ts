@@ -352,15 +352,23 @@ export async function executeDirectProviderTest(
   success: boolean;
   output?: string;
   error?: string;
+  classification: "ok" | "modelo_inexistente" | "sem_acesso" | "cota_esgotada" | "precisa_pago" | "timeout" | "outro_erro";
 }> {
   // Aceita aliases de borda (ex.: "agy") em qualquer chamada de teste.
   providerId = normalizeProviderId(providerId);
 
+  const isReasoningOrNewOpenAI =
+    model.includes("o1") ||
+    model.includes("o3") ||
+    model.includes("gpt-5") ||
+    model.startsWith("o");
+
   const testReq: ChatCompletionRequest = {
     model,
     messages: [{ role: "user" as const, content: "Respond with OK" }],
-    max_tokens: 5,
-    temperature: 0,
+    max_tokens: isReasoningOrNewOpenAI ? undefined : 5,
+    max_completion_tokens: isReasoningOrNewOpenAI ? 10 : undefined,
+    temperature: isReasoningOrNewOpenAI ? 1 : 0,
     stream: false,
   };
 
@@ -377,6 +385,7 @@ export async function executeDirectProviderTest(
           latency_ms: 0,
           success: false,
           error: "Cloudflare Workers AI (env.AI) não está habilitado no ambiente",
+          classification: "outro_erro",
         };
       }
       resPromise = executeCloudflareAI(testReq, env.AI, model);
@@ -392,6 +401,7 @@ export async function executeDirectProviderTest(
           latency_ms: 0,
           success: false,
           error: "Antigravity: Nenhum token de acesso válido. Realize o login OAuth no painel.",
+          classification: "sem_acesso",
         };
       }
       resPromise = executeAntigravityRequest(testReq, antigravResult.accessToken, antigravResult.projectId || "", model);
@@ -404,6 +414,7 @@ export async function executeDirectProviderTest(
           latency_ms: 0,
           success: false,
           error: "Sem chave de API para 1min.ai",
+          classification: "sem_acesso",
         };
       }
       const { executeOneMinAI } = await import("@/adapters/onemin");
@@ -417,17 +428,41 @@ export async function executeDirectProviderTest(
           latency_ms: 0,
           success: false,
           error: "Sem chave de API configurada",
+          classification: "sem_acesso",
         };
       }
       resPromise = executeOpenAICompatible(testReq, providerId, apiKey, model, overrideBaseUrl);
     }
 
-    const res = (await Promise.race([
+    let res = (await Promise.race([
       resPromise,
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Timeout " + timeoutMs + "ms")), timeoutMs)
       ),
     ])) as Response;
+
+    // Retry automático com max_completion_tokens se o modelo rejeitar max_tokens
+    if (!res.ok && res.status === 400 && !isReasoningOrNewOpenAI) {
+      const errPeek = await res.clone().text().catch(() => "");
+      if (errPeek.includes("max_completion_tokens") || errPeek.includes("max_tokens")) {
+        const retryReq: ChatCompletionRequest = {
+          ...testReq,
+          max_tokens: undefined,
+          max_completion_tokens: 10,
+          temperature: 1,
+        };
+        const retryPromise = executeOpenAICompatible(retryReq, providerId, apiKey, model, overrideBaseUrl);
+        const retryRes = await Promise.race([
+          retryPromise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout " + timeoutMs + "ms")), timeoutMs)
+          ),
+        ]).catch(() => null);
+        if (retryRes && retryRes.ok) {
+          res = retryRes;
+        }
+      }
+    }
 
     const latency = Date.now() - start;
     if (res.ok) {
@@ -442,21 +477,36 @@ export async function executeDirectProviderTest(
           text = String(j.response || j.output).trim().slice(0, 40);
         }
       } catch {}
-      return { provider: providerId, model, status: res.status, latency_ms: latency, success: true, output: text };
+      return { provider: providerId, model, status: res.status, latency_ms: latency, success: true, output: text, classification: "ok" };
     }
 
-    const errText = (await res.text().catch(() => "")).slice(0, 180);
-    return { provider: providerId, model, status: res.status, latency_ms: latency, success: false, error: errText };
+    const errText = (await res.text().catch(() => "")).slice(0, 240);
+    const classification = classifyError(res.status, errText);
+    return { provider: providerId, model, status: res.status, latency_ms: latency, success: false, error: errText, classification };
   } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const classification = msg.includes("Timeout") ? "timeout" : "outro_erro";
     return {
       provider: providerId,
       model,
-      status: 500,
+      status: msg.includes("Timeout") ? 504 : 500,
       latency_ms: Date.now() - start,
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: msg,
+      classification,
     };
   }
+}
+
+export function classifyError(status: number, errText?: string): "ok" | "modelo_inexistente" | "sem_acesso" | "cota_esgotada" | "precisa_pago" | "timeout" | "outro_erro" {
+  if (status >= 200 && status < 300) return "ok";
+  const err = (errText || "").toLowerCase();
+  if (status === 408 || status === 504 || err.includes("timeout") || err.includes("abort")) return "timeout";
+  if (status === 404 || err.includes("not found") || err.includes("does not exist") || err.includes("invalid model")) return "modelo_inexistente";
+  if (status === 401 || status === 403 || err.includes("unauthorized") || err.includes("invalid api key") || err.includes("auth")) return "sem_acesso";
+  if (status === 429 || err.includes("quota") || err.includes("rate limit") || err.includes("queue full") || err.includes("exhausted")) return "cota_esgotada";
+  if (status === 402 || err.includes("billing") || err.includes("balance") || err.includes("credit") || err.includes("payment")) return "precisa_pago";
+  return "outro_erro";
 }
 
 adminRouter.post("/providers/:id/test-models", async (c) => {

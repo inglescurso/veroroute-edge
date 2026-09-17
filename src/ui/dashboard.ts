@@ -2507,7 +2507,16 @@ git push origin master
             badge.innerText = '⚡ ' + r.latency_ms + 'ms · OK';
             showToast('✅ ' + modelName + ' respondeu em ' + r.latency_ms + 'ms!', 'success');
           } else {
-            var errBrief = r.status === 401 ? 'Sem Chave' : (r.status === 500 ? 'Erro 500' : 'Falhou (' + r.status + ')');
+            var labelMap = {
+              ok: 'OK',
+              modelo_inexistente: 'Inexistente (404)',
+              sem_acesso: 'Sem Acesso (401)',
+              cota_esgotada: 'Cota/Rate-limit (429)',
+              precisa_pago: 'Requer Pago (402)',
+              timeout: 'Timeout',
+              outro_erro: 'Falhou (' + r.status + ')'
+            };
+            var errBrief = (r.classification && labelMap[r.classification]) || (r.status === 401 ? 'Sem Chave' : 'Falhou (' + r.status + ')');
             badge.innerText = '❌ ' + errBrief;
             badge.title = r.error || 'Falha no teste';
             showToast('❌ ' + modelName + ': ' + (r.error || errBrief), 'error');
@@ -2537,13 +2546,17 @@ git push origin master
       var keyInput = document.getElementById('mpm-key-input');
       var keyVal = keyInput ? keyInput.value.trim() : '';
 
+      var discoveredEls = document.querySelectorAll('#mpm-discovered-list .model-select-item');
+      var modalModelNames = Array.from(discoveredEls).map(function(el) { return el.getAttribute('data-model-name'); }).filter(Boolean);
+
       try {
         var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/test-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             apiKey: keyVal || undefined,
-            baseUrl: endpointVal || undefined
+            baseUrl: endpointVal || undefined,
+            models: modalModelNames.length > 0 ? modalModelNames.slice(0, 12) : undefined
           })
         });
         var data = await res.json();
@@ -2567,7 +2580,16 @@ git push origin master
               if (r.success) {
                 badge.innerText = '⚡ ' + r.latency_ms + 'ms · OK';
               } else {
-                var errBrief = r.status === 401 ? 'Sem Chave' : (r.status === 500 ? 'Erro 500' : 'Falhou (' + r.status + ')');
+                var labelMap = {
+                  ok: 'OK',
+                  modelo_inexistente: 'Inexistente (404)',
+                  sem_acesso: 'Sem Acesso (401)',
+                  cota_esgotada: 'Cota/Rate-limit (429)',
+                  precisa_pago: 'Requer Pago (402)',
+                  timeout: 'Timeout',
+                  outro_erro: 'Falhou (' + r.status + ')'
+                };
+                var errBrief = (r.classification && labelMap[r.classification]) || (r.status === 401 ? 'Sem Chave' : 'Falhou (' + r.status + ')');
                 badge.innerText = '❌ ' + errBrief;
                 badge.title = r.error || 'Falha no teste';
               }
