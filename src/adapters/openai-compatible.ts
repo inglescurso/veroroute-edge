@@ -167,17 +167,11 @@ export async function executeOpenAICompatible(
 
   // Prefixo de provedor do gateway (ex.: "groq/llama-3.3-70b-versatile")
   // deve ser removido, mas ids nativos que usam namespace precisam ser
-  // preservados: Groq usa "openai/gpt-oss-20b" e Cloudflare Workers AI usa "@cf/...".
+  // preservados: Groq usa "openai/gpt-oss-20b", Nvidia usa "meta/llama..." e OpenRouter usa "deepseek/deepseek-v4.1-flash".
   let targetModel = modelName;
-  const PROVIDER_PREFIXES = [
-    "antigravity", "agy", "1min", "cloudflare-ai", "cerebras", "groq",
-    "gemini", "azure", "bedrock", "openrouter", "pollinations",
-  ];
   // Remove somente o prefixo do provedor que esta realmente executando a chamada.
-  // Ex.: no provider OpenRouter, "deepseek/deepseek-v4.1-flash" e um id nativo e
-  // NAO pode virar "deepseek-v4.1-flash".
   const acceptedPrefixes = providerId === "antigravity" ? ["antigravity", "agy"] : [providerId];
-  const providerPrefix = PROVIDER_PREFIXES.find((p) => acceptedPrefixes.includes(p) && targetModel.startsWith(p + "/"));
+  const providerPrefix = acceptedPrefixes.find((p) => targetModel.startsWith(p + "/"));
   if (providerPrefix) {
     targetModel = targetModel.slice(providerPrefix.length + 1) || targetModel;
   }

@@ -1,4 +1,4 @@
-import { DEFAULT_MODELS_CATALOG } from "@/config/constants";
+import { enrichModelMetadata, getStaticCatalog } from "@/config/modelRegistry";
 import { executeAntigravityRequest } from "@/adapters/antigravity";
 import { executeCloudflareAI } from "@/adapters/cloudflare-ai";
 import { executeOneMinAI } from "@/adapters/onemin";
@@ -6,7 +6,7 @@ import { executeOpenAICompatible } from "@/adapters/openai-compatible";
 import { getValidAntigravityAccessToken } from "@/oauth/antigravity";
 import { markKeyRateLimited, selectActiveCredential } from "./keyPool";
 import { getAdminConfig } from "@/admin/store";
-import { getProviderConfig, registerCustomProvider } from "@/config/providers";
+import { getProviderConfig, registerCustomProvider, PROVIDER_REGISTRY } from "@/config/providers";
 import { normalizeProviderId } from "@/config/providerAliases";
 import { applyRoutingStrategy, recordCandidateSuccess, type TargetCandidate } from "./strategies";
 import { injectToolCallingPrompt, postProcessEmulatedResponse, completionToSSE } from "@/adapters/toolEmulation";
@@ -21,62 +21,135 @@ import type { AdminConfig } from "@/admin/store";
 import type { AuthPrincipal } from "@/admin/auth";
 
 // ---------------------------------------------------------------------------
-// Candidate resolution
+// Candidate resolution — respeita providerStates, modelStates e removedModels
 // ---------------------------------------------------------------------------
+function isCandidateAllowed(provider: string, modelName: string, adminCfg?: AdminConfig): boolean {
+  if (!adminCfg) return true;
+  if (adminCfg.providerStates?.[provider]?.enabled === false) return false;
+  if (adminCfg.modelStates?.[`${provider}/${modelName}`]?.enabled === false) return false;
+  if (adminCfg.modelStates?.[modelName]?.enabled === false) return false;
+  if (adminCfg.removedModels?.[provider]?.includes(modelName)) return false;
+  return true;
+}
+
 export function resolveCandidates(
   request: ChatCompletionRequest,
   adminCfg?: AdminConfig
 ): { candidates: TargetCandidate[]; comboStrategy?: string } {
-  const model = request.model;
+  const model = (request.model || "").trim();
+  if (!model) return { candidates: [] };
 
+  // 1. Combos inteligentes
   if (adminCfg?.combos?.[model]?.enabled) {
     const combo = adminCfg.combos[model];
+    const validTargets = combo.targets
+      .filter((t) => isCandidateAllowed(t.provider, t.model, adminCfg))
+      .map((t) => {
+        const enriched = enrichModelMetadata(t.provider, t.model);
+        return {
+          provider: t.provider,
+          model: t.model,
+          weight: t.weight,
+          priority: t.priority,
+          cost: enriched.pricing?.input_per_million ?? 0,
+        };
+      });
+
     return {
-      candidates: combo.targets.map((t) => ({
-        provider: t.provider,
-        model: t.model,
-        weight: t.weight,
-        priority: t.priority,
-        cost: 0,
-      })),
+      candidates: validTargets,
       comboStrategy: combo.strategy,
     };
   }
 
-  // "agy" é aceito como alias de borda de "antigravity" (normalizado aqui, em um único ponto).
-  for (const prefix of ["antigravity", "agy", "1min", "cloudflare-ai", "cerebras", "groq", "gemini", "azure", "bedrock"]) {
-    if (model.startsWith(prefix + "/") || (prefix === "cloudflare-ai" && model.startsWith("@cf/"))) {
-      const provider = normalizeProviderId(prefix);
-      const normalizedModel = provider === prefix ? model : provider + model.slice(prefix.length);
+  // 2. Prefixo explícito de Cloudflare Workers AI (@cf/...)
+  if (model.startsWith("@cf/")) {
+    const provider = "cloudflare-ai";
+    if (isCandidateAllowed(provider, model, adminCfg)) {
+      const enriched = enrichModelMetadata(provider, model);
       return {
-        candidates: [{ provider, model: normalizedModel, weight: 1, priority: 1, cost: 0 }],
+        candidates: [{
+          provider,
+          model,
+          weight: 1,
+          priority: 1,
+          cost: enriched.pricing?.input_per_million ?? 0,
+        }],
+      };
+    }
+    return { candidates: [] };
+  }
+
+  // 3. Prefixo derivado dinamicamente de todos os provedores conhecidos (PROVIDER_REGISTRY + customProviders)
+  if (model.includes("/")) {
+    const slashIdx = model.indexOf("/");
+    const rawPrefix = model.slice(0, slashIdx);
+    const providerId = normalizeProviderId(rawPrefix);
+
+    const isKnownProvider =
+      Boolean(PROVIDER_REGISTRY[providerId]) ||
+      Boolean(adminCfg?.customProviders?.[providerId]) ||
+      Boolean(getProviderConfig(providerId));
+
+    if (isKnownProvider) {
+      const subModel = model.slice(slashIdx + 1);
+      if (isCandidateAllowed(providerId, model, adminCfg) && isCandidateAllowed(providerId, subModel, adminCfg)) {
+        const normalizedModel = providerId === rawPrefix ? model : `${providerId}/${subModel}`;
+        const enriched = enrichModelMetadata(providerId, subModel);
+        return {
+          candidates: [{
+            provider: providerId,
+            model: normalizedModel,
+            weight: 1,
+            priority: 1,
+            cost: enriched.pricing?.input_per_million ?? 0,
+          }],
+        };
+      }
+      return { candidates: [] };
+    }
+  }
+
+  // 4. Modelo sem prefixo: busca em provedores embutidos ativos
+  for (const [pId, prov] of Object.entries(PROVIDER_REGISTRY)) {
+    if (!isCandidateAllowed(pId, model, adminCfg)) continue;
+
+    const baseModels = prov.models?.length > 0 ? prov.models : getStaticCatalog(pId);
+    const customModels = adminCfg?.customModels?.[pId] || [];
+    if (baseModels.includes(model) || customModels.includes(model)) {
+      const enriched = enrichModelMetadata(pId, model);
+      return {
+        candidates: [{
+          provider: pId,
+          model,
+          weight: 1,
+          priority: 1,
+          cost: enriched.pricing?.input_per_million ?? 0,
+        }],
       };
     }
   }
 
-  const entry = DEFAULT_MODELS_CATALOG.find((m) => m.id === model);
-  if (entry) {
-    return {
-      candidates: [{
-        provider: entry.provider,
-        model: entry.id,
-        weight: 1,
-        priority: 1,
-        cost: entry.pricing?.input_per_million ?? 0,
-      }],
-    };
+  // 5. Modelo sem prefixo em custom providers ativos
+  if (adminCfg?.customProviders) {
+    for (const [cpId, cp] of Object.entries(adminCfg.customProviders)) {
+      if (!isCandidateAllowed(cpId, model, adminCfg)) continue;
+      const allModels = [...(cp.models || []), ...(adminCfg.customModels?.[cpId] || [])];
+      if (allModels.includes(model)) {
+        return {
+          candidates: [{
+            provider: cpId,
+            model,
+            weight: 1,
+            priority: 1,
+            cost: cp.costPerMillionInput ?? 0,
+          }],
+        };
+      }
+    }
   }
 
-  const fallback = DEFAULT_MODELS_CATALOG[0];
-  return {
-    candidates: fallback ? [{
-      provider: fallback.provider,
-      model: fallback.id,
-      weight: 1,
-      priority: 1,
-      cost: fallback.pricing?.input_per_million ?? 0,
-    }] : [],
-  };
+  // 6. Sem fallback silencioso para gpt-4o: retorna lista vazia para resultar em 400 Bad Request
+  return { candidates: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +212,18 @@ export async function dispatchWithCascade(
   if (cached) return cached;
 
   const { candidates, comboStrategy } = resolveCandidates(request, adminCfg);
+  if (candidates.length === 0) {
+    return Response.json(
+      {
+        error: {
+          message: `Model '${request.model}' is unknown or not available. Please specify a valid model or provider prefix (e.g. 'groq/llama-3.3-70b-versatile').`,
+          type: "invalid_request_error",
+          code: "model_not_found",
+        },
+      },
+      { status: 400 }
+    );
+  }
   const strategyName = comboStrategy || env.DEFAULT_ROUTING_STRATEGY || "priority";
   const ordered = applyRoutingStrategy(candidates, strategyName, request.model);
 
