@@ -165,12 +165,17 @@ export async function executeOpenAICompatible(
     headers["X-Title"] = "OmniRoute Serverless";
   }
 
-  // Ajusta o nome do modelo se houver prefixo de provedor
+  // Prefixo de provedor do gateway (ex.: "groq/llama-3.3-70b-versatile")
+  // deve ser removido, mas ids nativos que usam namespace precisam ser
+  // preservados: Groq usa "openai/gpt-oss-20b" e Cloudflare Workers AI usa "@cf/...".
   let targetModel = modelName;
-  if (targetModel.includes("/")) {
-    if (providerId !== "openrouter") {
-      targetModel = targetModel.split("/").pop() || targetModel;
-    }
+  const PROVIDER_PREFIXES = [
+    "antigravity", "agy", "1min", "cloudflare-ai", "cerebras", "groq",
+    "gemini", "azure", "bedrock", "openrouter", "pollinations",
+  ];
+  const providerPrefix = PROVIDER_PREFIXES.find((p) => targetModel.startsWith(p + "/"));
+  if (providerPrefix) {
+    targetModel = targetModel.slice(providerPrefix.length + 1) || targetModel;
   }
 
   const rawBase = (overrideBaseUrl || provider.baseUrl || "").replace(/\/+$/, "");

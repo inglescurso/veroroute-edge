@@ -597,6 +597,8 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
         let extracted = list
           .map((m: any) => (typeof m === "string" ? m : (m.id || m.name)))
           .filter((m: any): m is string => Boolean(m))
+          // O id e preservado exatamente como o upstream devolve: provedores como
+          // a Groq exigem o namespace ("openai/gpt-oss-120b") e recusam a forma curta.
           .map((m: string) => m.replace(/^models\//, ""));
 
         if (id === "openrouter-free") {
@@ -783,13 +785,16 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
   const registryModels = prov?.models || [];
   const removedModels = cfg.removedModels?.[id] || [];
 
-  const allAvailable = Array.from(new Set([...registryModels, ...activeCustomModels]))
+  // O catalogo do provedor (registry + modelos ativos) e a fonte dos testes:
+  // ids desatualizados aqui apareciam como falha mesmo com a chave correta.
+  const discovered = Array.from(new Set([...registryModels, ...activeCustomModels]))
     .filter((m) => !removedModels.includes(m));
 
-  // Prioriza modelos passados no body ou os primeiros ativos (máximo 5)
+  // Prioriza modelos passados no body ou os primeiros ativos do provedor
+  // (12 em vez de 5, para cobrir catalogos como o da Groq).
   const targetModels = (Array.isArray(body.models) && body.models.length > 0)
-    ? body.models.slice(0, 5)
-    : allAvailable.slice(0, 5);
+    ? body.models.slice(0, 12)
+    : discovered.slice(0, 12);
 
   if (targetModels.length === 0) {
     return c.json({ ok: false, results: [], message: "Nenhum modelo cadastrado para testar" });

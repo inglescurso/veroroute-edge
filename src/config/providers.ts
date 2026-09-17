@@ -106,7 +106,9 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     name: "Groq Cloud",
     baseUrl: "https://api.groq.com/openai/v1",
     authType: "bearer",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+    // A Groq descontinuou llama-3.3/llama-3.1 e hoje expoe os ids com namespace,
+    // por exemplo "openai/gpt-oss-120b". O id SEM namespace e recusado com 404.
+    models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     freeTier: true,
     costPerMillionInput: 0,
     costPerMillionOutput: 0,
@@ -120,7 +122,9 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     name: "Cerebras Inference",
     baseUrl: "https://api.cerebras.ai/v1",
     authType: "bearer",
-    models: ["llama3.3-70b", "llama3.1-8b"],
+    // Cerebras hoje expoe gpt-oss-120b e qwen-3.8-27b (ambos exigem plano pago);
+    // llama3.3-70b e llama3.1-8b retornam 404 para contas novas.
+    models: ["gpt-oss-120b", "qwen-3.8-27b", "llama3.3-70b", "llama3.1-8b"],
     freeTier: true,
     costPerMillionInput: 0,
     costPerMillionOutput: 0,
