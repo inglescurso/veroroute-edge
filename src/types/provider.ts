@@ -9,6 +9,7 @@ export type ProviderId =
   | "alibaba"
   | "gemini"
   | "groq"
+  | "kiro"
   | "cerebras"
   | "cloudflare-ai"
   | "antigravity"

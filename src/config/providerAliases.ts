@@ -15,6 +15,10 @@ export const GEMINI_OPENAI_COMPAT_BASE_URL = "https://generativelanguage.googlea
 const PROVIDER_ALIASES: Record<string, string> = {
   agy: "antigravity",
   "antigravity-cli": "antigravity",
+  // Kiro AI aliases
+  kr: "kiro",
+  "kiro-ai": "kiro",
+  "amazon-q": "kiro",
   // Aliases antigos/gerados a partir dos nomes dos templates da interface.
   "openrouter-free": "openrouter",
   "openrouter-free-models": "openrouter",

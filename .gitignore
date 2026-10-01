@@ -10,3 +10,7 @@ dist/
 .wrangler/
 dist2/
 deploy-personal.sh
+
+# Backups locais — nunca subir para o GitHub
+backups/
+*.tar.gz

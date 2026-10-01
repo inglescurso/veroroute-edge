@@ -117,6 +117,31 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     supportsVision: false,
     rpmLimit: 30,
   },
+  kiro: {
+    id: "kiro",
+    name: "Kiro AI (AWS CodeWhisperer / Amazon Q)",
+    // O baseUrl real varia por região — resolvido dinamicamente em src/oauth/kiro.ts
+    baseUrl: "https://codewhisperer.us-east-1.amazonaws.com",
+    authType: "oauth",
+    // Modelos verificados no catálogo live da Kiro (kiro.dev/changelog/models)
+    models: [
+      "claude-sonnet-5",
+      "claude-sonnet-4.5",
+      "claude-haiku-4.5",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "deepseek-3.2",
+      "minimax-m2.5",
+      "qwen3-coder-next",
+    ],
+    freeTier: true,
+    costPerMillionInput: 0,
+    costPerMillionOutput: 0,
+    supportsStreaming: true,
+    supportsTools: true,
+    supportsVision: true,
+  },
   cerebras: {
     id: "cerebras",
     name: "Cerebras Inference",

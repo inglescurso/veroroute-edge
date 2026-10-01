@@ -64,6 +64,19 @@ export const STATIC_PROVIDER_CATALOGS: Record<string, string[]> = {
     "claude-sonnet-4-6",
     "gpt-oss-120b-medium",
   ],
+  // Kiro AI — AWS CodeWhisperer / Amazon Q (OAuth via tokens importados do IDE)
+  // Modelos validados live no catálogo da Kiro (kiro.dev/changelog/models)
+  kiro: [
+    "claude-sonnet-5",
+    "claude-sonnet-4.5",
+    "claude-haiku-4.5",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "deepseek-3.2",
+    "minimax-m2.5",
+    "qwen3-coder-next",
+  ],
   // 1min: removido do catálogo nativo — cadastrar como provedor customizado no painel admin
   gemini: [
     "gemini-2.5-pro",
