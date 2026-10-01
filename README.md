@@ -54,6 +54,7 @@
 
 ### 🚀 Key Capabilities
 
+- 🛡️ **Anti-Ban Architecture (Proxy-Free)** — Since requests run directly from Cloudflare's massive shared datacenter IPs, your egress traffic blends into thousands of legitimate corporate apps. This drastically reduces the chance of IP bans from providers compared to using cheap or datacenter proxies, allowing you to seamlessly rotate multiple API keys (using Cascade) without needing a single HTTP proxy.
 - 🔄 **Resilient Cascade Router** — Automatic fallback on HTTP 429/5xx errors, exponential retry backoff, per-candidate timeouts, and KV-persisted cooldowns.
 - 🛠️ **Universal Tool Calling Emulation** — Prompt-injection tool calling and SSE stream conversion for providers lacking native tool support (Cloudflare Workers AI, Pollinations, 1min AI).
 - ⚡ **Edge Response Caching** — Automatic caching using Cloudflare Cache API for deterministic requests (`temperature <= 0.1`) with custom TTLs.
@@ -213,6 +214,7 @@ O **VeroRoute Edge** é um gateway de IA serverless e roteador inteligente proje
 
 ### 🚀 Principais Funcionalidades
 
+- 🛡️ **Arquitetura Anti-Ban (Sem Proxies)** — O tráfego de saída utiliza os IPs compartilhados globais da Cloudflare, misturando suas requisições com milhares de aplicativos corporativos legítimos. Isso reduz drasticamente o risco de banimentos por IP (que ocorrem frequentemente ao usar proxies baratos ou de datacenters), permitindo a rotação de múltiplas chaves em Cascata sem a necessidade de gerenciar uma frota de proxies HTTP.
 - 🔄 **Roteador Cascade Resiliente** — Fallback automático em erros 429/5xx, backoff exponencial, timeout por candidato e cooldown persistido em Cloudflare KV.
 - 🛠️ **Emulação Universal de Tool Calling** — Injeção de prompts para chamada de ferramentas e conversão para SSE em provedores sem suporte nativo (Workers AI, Pollinations, 1min AI).
 - ⚡ **Cache de Respostas no Edge** — Cache automático via Cloudflare Cache API para requisições determinísticas (`temperature <= 0.1`) com TTL configurável.
