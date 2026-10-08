@@ -80,6 +80,8 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     authType: "query",
     models: [
+      "gemini-3.8-flash",
+      "gemini-3.8-pro",
       "gemini-2.5-pro",
       "gemini-2.5-flash",
       "gemini-2.5-flash-thinking-preview",
@@ -107,6 +109,14 @@ export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
     baseUrl: "https://daily-cloudcode-pa.googleapis.com",
     authType: "oauth",
     models: [
+      "gemini-3.8-flash-high",
+      "gemini-3.8-flash-medium",
+      "gemini-3.8-flash-low",
+      "gemini-3.8-flash-tiered",
+      "gemini-3.8-flash",
+      "gemini-3.8-pro-high",
+      "gemini-3.8-pro-low",
+      "gemini-3.8-pro",
       "gemini-3.7-flash-high",
       "gemini-3.7-flash-medium",
       "gemini-3.7-flash-low",

@@ -14,6 +14,7 @@ import {
   GEMINI_OPENAI_COMPAT_BASE_URL,
   buildModelsUrl,
   extractModelIds,
+  isGoogleAiStudioKey,
   isOpenAICompatBaseUrl,
   normalizeProviderId,
   resolveGeminiSurface,
@@ -94,7 +95,8 @@ function antigravityPayload(json: any): any {
 export async function fetchAntigravityAvailableModels(
   accessToken: string,
   projectId?: string,
-  timeoutMs = 8000
+  timeoutMs = 8000,
+  overrideBaseUrl?: string
 ): Promise<DiscoveryResult> {
   if (!accessToken) {
     return {
@@ -111,7 +113,11 @@ export async function fetchAntigravityAvailableModels(
   const attempts: string[] = [];
   let lastError: string | null = null;
 
-  for (const host of ANTIGRAVITY_DISCOVERY_HOSTS) {
+  const hosts = overrideBaseUrl && overrideBaseUrl.trim()
+    ? Array.from(new Set([stripTrailingSlashes(overrideBaseUrl.trim()), ...ANTIGRAVITY_DISCOVERY_HOSTS]))
+    : ANTIGRAVITY_DISCOVERY_HOSTS;
+
+  for (const host of hosts) {
     const shortHost = host.replace("https://", "");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -279,9 +285,12 @@ export async function discoverModels(
 
   // 2. Google Cloud Code Assist (Antigravity)
   if (id === "antigravity") {
-    let accessToken = apiKey;
+    let accessToken = "";
     let projectId = "";
-    if (!accessToken && credentials.env) {
+
+    // 1) Antigravity usa autenticação Google OAuth nativa gerenciada pelo painel.
+    // Sempre priorizar o token OAuth válido armazenado no KV se credentials.env existir:
+    if (credentials.env) {
       try {
         const { getValidAntigravityAccessToken, discoverCompanionProject } = await import("@/oauth/antigravity");
         const agyAuth = await getValidAntigravityAccessToken(credentials.env).catch(() => null);
@@ -295,6 +304,14 @@ export async function discoverModels(
       } catch {}
     }
 
+    // 2) Se não houver token no KV e foi passado apiKey que não seja chave do AI Studio:
+    if (!accessToken && apiKey) {
+      const trimmed = apiKey.trim();
+      if (!isGoogleAiStudioKey(trimmed)) {
+        accessToken = trimmed;
+      }
+    }
+
     if (!accessToken) {
       return {
         models: getStaticCatalog("antigravity"),
@@ -305,7 +322,21 @@ export async function discoverModels(
       };
     }
 
-    return fetchAntigravityAvailableModels(accessToken, projectId, timeoutMs);
+    const result = await fetchAntigravityAvailableModels(accessToken, projectId, timeoutMs, baseUrl);
+
+    // Se o token fornecido falhou e temos token no KV:
+    if (result.source === "catalog" && credentials.env && apiKey && accessToken === apiKey) {
+      try {
+        const { getValidAntigravityAccessToken, discoverCompanionProject } = await import("@/oauth/antigravity");
+        const agyAuth = await getValidAntigravityAccessToken(credentials.env).catch(() => null);
+        if (agyAuth?.accessToken && agyAuth.accessToken !== accessToken) {
+          const fallbackPid = agyAuth.projectId || (await discoverCompanionProject(agyAuth.accessToken).catch(() => ""));
+          return await fetchAntigravityAvailableModels(agyAuth.accessToken, fallbackPid, timeoutMs, baseUrl);
+        }
+      } catch {}
+    }
+
+    return result;
   }
 
   // 3. Google Gemini (AI Studio)

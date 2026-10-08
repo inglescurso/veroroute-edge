@@ -53,6 +53,14 @@ export const STATIC_PROVIDER_CATALOGS: Record<string, string[]> = {
   antigravity: [
     // Catálogo de fallback quando o upstream (fetchAvailableModels) não responde.
     // Atualizado em 2026-10 com base no catálogo real do Cloud Code Assist.
+    "gemini-3.8-flash-high",
+    "gemini-3.8-flash-medium",
+    "gemini-3.8-flash-low",
+    "gemini-3.8-flash-tiered",
+    "gemini-3.8-flash",
+    "gemini-3.8-pro-high",
+    "gemini-3.8-pro-low",
+    "gemini-3.8-pro",
     "gemini-3.7-flash-high",
     "gemini-3.7-flash-medium",
     "gemini-3.7-flash-low",
@@ -82,6 +90,8 @@ export const STATIC_PROVIDER_CATALOGS: Record<string, string[]> = {
   // 1min: removido do catálogo nativo — cadastrar como provedor customizado no painel admin
   // Google AI Studio — modelos atualizados em 2026-10
   gemini: [
+    "gemini-3.8-flash",
+    "gemini-3.8-pro",
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-thinking-preview",

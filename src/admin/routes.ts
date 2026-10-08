@@ -325,7 +325,7 @@ adminRouter.post("/providers/:id/models", async (c) => {
     }
     for (const model of rawModelsToAdd) {
       const mk = id + "/" + model;
-      if (cfg.modelStates[mk]) delete cfg.modelStates[mk];
+      cfg.modelStates[mk] = { enabled: true };
     }
   });
   return c.json({

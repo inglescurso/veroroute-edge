@@ -282,7 +282,7 @@ export function renderDashboardHtml(): string {
       font-size: 0.8rem;
     }
     .model-select-item:hover { background: #e2e8f0 !important; border-color: #38bdf8; }
-    .model-select-item * { color: #0f172a; }
+    .model-select-item > div > * { color: #0f172a; }
     .model-select-name { color: #020617 !important; opacity: 1 !important; font-weight: 700; }
     #mpm-discovered-list { background: #e2e8f0 !important; padding: 0.5rem; border: 1px solid #94a3b8; border-radius: 8px; }
     #mpm-model-search, #adm-model-search { color: #0f172a !important; background: #ffffff !important; border-color: #94a3b8 !important; }
@@ -301,7 +301,17 @@ export function renderDashboardHtml(): string {
       opacity: 1 !important; appearance: auto;
     }
     .model-select-item .model-select-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; }
-    .model-select-item .btn { flex-shrink: 0; }
+    .model-select-item .btn, .model-select-item .btn-secondary {
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      border: 1px solid #475569 !important;
+      flex-shrink: 0;
+    }
+    .model-select-item .btn:hover, .model-select-item .btn-secondary:hover {
+      background: #1e293b !important;
+      color: #38bdf8 !important;
+      border-color: #38bdf8 !important;
+    }
 
     main {
       flex: 1;
@@ -2383,6 +2393,9 @@ git push origin master
       if (providerId === '1min') {
         return '<strong>1min.ai:</strong> Endpoint oficial da API (padrão: <code>https://api.1min.ai/api/chat-with-ai</code>).';
       }
+      if (providerId === 'antigravity') {
+        return '<strong>Antigravity CLI (Google Cloud Code Assist):</strong> Endpoint oficial (padrão: <code>https://daily-cloudcode-pa.googleapis.com</code>). Autenticação via Google OAuth gerenciada na aba Antigravity OAuth.';
+      }
       if (providerId === 'openai') {
         return '<strong>OpenAI Oficial:</strong> Padrão <code>https://api.openai.com/v1</code> ou seu Cloudflare AI Gateway.';
       }
@@ -2489,7 +2502,14 @@ git push origin master
       var endpointHint = document.getElementById('mpm-endpoint-hint');
       if (endpointHint) endpointHint.innerHTML = getProviderEndpointHint(providerId);
       var keyInput = document.getElementById('mpm-key-input');
-      if (keyInput) keyInput.value = '';
+      if (keyInput) {
+        keyInput.value = '';
+        if (providerId === 'antigravity') {
+          keyInput.placeholder = 'Autenticado via Google OAuth (aba Antigravity OAuth). Deixe em branco.';
+        } else {
+          keyInput.placeholder = 'Deixe em branco para usar as chaves salvas no pool';
+        }
+      }
 
       renderActiveModelsList();
 
@@ -2569,6 +2589,13 @@ git push origin master
       var keyInput = document.getElementById('mpm-key-input');
       var keyVal = keyInput ? keyInput.value.trim() : '';
 
+      // Antigravity usa Google OAuth. Se a chave inserida/autofilled não for token OAuth puro (ya29.),
+      // não enviamos para evitar que autofill de API key quebre a descoberta upstream:
+      var effectiveApiKey = keyVal;
+      if (activeModalProviderId === 'antigravity' && keyVal && !keyVal.startsWith('ya29.')) {
+        effectiveApiKey = '';
+      }
+
       if (btn) {
         btn.disabled = true;
         btn.innerText = 'Buscando...';
@@ -2582,7 +2609,7 @@ git push origin master
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            apiKey: keyVal || undefined,
+            apiKey: effectiveApiKey || undefined,
             baseUrl: endpointVal || undefined
           })
         });
@@ -2657,13 +2684,17 @@ git push origin master
       var endpointVal = endpointInput ? endpointInput.value.trim() : '';
       var keyInput = document.getElementById('mpm-key-input');
       var keyVal = keyInput ? keyInput.value.trim() : '';
+      var effectiveApiKey = keyVal;
+      if (activeModalProviderId === 'antigravity' && keyVal && !keyVal.startsWith('ya29.')) {
+        effectiveApiKey = '';
+      }
 
       try {
         var res = await adminFetch('/api/admin/providers/' + activeModalProviderId + '/test-models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            apiKey: keyVal || undefined,
+            apiKey: effectiveApiKey || undefined,
             baseUrl: endpointVal || undefined,
             models: [modelName]
           })
@@ -2714,6 +2745,10 @@ git push origin master
       var endpointVal = endpointInput ? endpointInput.value.trim() : '';
       var keyInput = document.getElementById('mpm-key-input');
       var keyVal = keyInput ? keyInput.value.trim() : '';
+      var effectiveApiKey = keyVal;
+      if (activeModalProviderId === 'antigravity' && keyVal && !keyVal.startsWith('ya29.')) {
+        effectiveApiKey = '';
+      }
 
       var discoveredEls = document.querySelectorAll('#mpm-discovered-list .model-select-item');
       var modalModelNames = Array.from(discoveredEls).map(function(el) { return el.getAttribute('data-model-name'); }).filter(Boolean);
@@ -2723,7 +2758,7 @@ git push origin master
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            apiKey: keyVal || undefined,
+            apiKey: effectiveApiKey || undefined,
             baseUrl: endpointVal || undefined,
             models: modalModelNames.length > 0 ? modalModelNames.slice(0, 12) : undefined
           })

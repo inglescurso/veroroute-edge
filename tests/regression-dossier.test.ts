@@ -237,7 +237,8 @@ describe("Dossiê de Falhas do Subsistema de Modelos (Casos de Regressão)", () 
     expect(cfModels).toContain("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
 
     const agyModels = getStaticCatalog("antigravity");
-    expect(agyModels.length).toBe(12);
+    expect(agyModels.length).toBe(20);
+    expect(agyModels).toContain("gemini-3.8-flash");
     expect(agyModels).toContain("claude-opus-4-6-thinking");
 
     const all = listAllAvailableModels();

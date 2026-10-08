@@ -93,9 +93,10 @@ export function buildModelsUrl(baseUrl: string): string {
  *   { data: [{ id }] } | { models: [{ id|name }] } | [{ id }] | { models: { slug: {...} } }
  */
 export function extractModelIds(payload: unknown): string[] {
-  const list = Array.isArray(payload)
-    ? payload
-    : ((payload as any)?.data ?? (payload as any)?.models);
+  const p = payload as any;
+  const list = Array.isArray(p)
+    ? p
+    : (p?.data ?? p?.models ?? p?.availableModels ?? p?.available_models ?? p?.candidates);
 
   if (Array.isArray(list)) {
     return list
