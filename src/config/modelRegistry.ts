@@ -51,6 +51,8 @@ export const STATIC_PROVIDER_CATALOGS: Record<string, string[]> = {
     "@cf/baai/bge-small-en-v1.5",
   ],
   antigravity: [
+    // Catálogo de fallback quando o upstream (fetchAvailableModels) não responde.
+    // Atualizado em 2026-10 com base no catálogo real do Cloud Code Assist.
     "gemini-3.7-flash-high",
     "gemini-3.7-flash-medium",
     "gemini-3.7-flash-low",
@@ -78,6 +80,7 @@ export const STATIC_PROVIDER_CATALOGS: Record<string, string[]> = {
     "qwen3-coder-next",
   ],
   // 1min: removido do catálogo nativo — cadastrar como provedor customizado no painel admin
+  // Google AI Studio — modelos atualizados em 2026-10
   gemini: [
     "gemini-2.5-pro",
     "gemini-2.5-flash",

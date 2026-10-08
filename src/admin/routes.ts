@@ -65,7 +65,8 @@ adminRouter.get("/config", async (c) => {
     const state = cfg.providerStates[id]?.enabled ?? true;
     const removed = new Set(cfg.removedModels?.[id] || []);
     const customModels = (cfg.customModels[id] || []).filter((m) => !removed.has(m));
-    const baseModels = (staticCfg.models || []).filter((m) => !removed.has(m));
+    const rawBase = (staticCfg.models && staticCfg.models.length > 0) ? staticCfg.models : (getStaticCatalog(id) || []);
+    const baseModels = rawBase.filter((m) => !removed.has(m));
     const mergedModels = [...baseModels, ...customModels.filter((m) => !baseModels.includes(m))];
     const finalModels = mergedModels.filter((m) => cfg.modelStates[id + "/" + m]?.enabled !== false);
     const keys = await getCustomProviderKeys(c.env, id);
@@ -223,7 +224,12 @@ adminRouter.post("/providers", async (c) => {
         name: PROVIDER_REGISTRY[id].name,
         baseUrl: cfg.providerBaseUrls?.[id] || PROVIDER_REGISTRY[id].baseUrl,
         apiKeys: apiKeys.map(maskSecret),
-        models: [...(PROVIDER_REGISTRY[id].models || []), ...(cfg.customModels[id] || [])],
+        models: [
+          ...((PROVIDER_REGISTRY[id].models && PROVIDER_REGISTRY[id].models.length > 0)
+            ? PROVIDER_REGISTRY[id].models
+            : (getStaticCatalog(id) || [])),
+          ...(cfg.customModels[id] || []),
+        ],
       },
     });
   }
@@ -368,7 +374,9 @@ adminRouter.post("/providers/:id/fetch-models", async (c) => {
 
   // Combinar com catálogo conhecido do provedor e modelos ativos
   const activeCustomModels = cfg.customModels[id] || [];
-  const registryModels = prov?.models || [];
+  const registryModels = (prov?.models && prov.models.length > 0)
+    ? prov.models
+    : (getStaticCatalog(id) || []);
   const removedModels = cfg.removedModels?.[id] || [];
 
   const allAvailable = Array.from(
@@ -568,7 +576,9 @@ adminRouter.post("/providers/:id/test-models", async (c) => {
   const cfg = await getAdminConfig(c.env);
   const prov = cfg.customProviders[id] || PROVIDER_REGISTRY[id];
   const activeCustomModels = cfg.customModels[id] || [];
-  const registryModels = prov?.models || [];
+  const registryModels = (prov?.models && prov.models.length > 0)
+    ? prov.models
+    : (getStaticCatalog(id) || []);
   const removedModels = cfg.removedModels?.[id] || [];
 
   // O catalogo do provedor (registry + modelos ativos) e a fonte dos testes:
@@ -657,7 +667,8 @@ adminRouter.get("/models", async (c) => {
   for (const [pid, p] of Object.entries(PROVIDER_REGISTRY)) {
     const enabled = cfg.providerStates[pid]?.enabled ?? true;
     const removed = new Set(cfg.removedModels?.[pid] || []);
-    for (const m of p.models || []) {
+    const baseList = (p.models && p.models.length > 0) ? p.models : (getStaticCatalog(pid) || []);
+    for (const m of baseList) {
       if (removed.has(m)) continue;
       allModels.push({ id: m, provider: pid, enabled: enabled && (cfg.modelStates[pid + "/" + m]?.enabled ?? true) });
     }

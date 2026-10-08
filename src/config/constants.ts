@@ -59,7 +59,12 @@ export const CODEX_PUBLIC_CONFIG = {
   scopes: "openid profile email offline_access",
 };
 
-// Catálogo de modelos suportados pelo VeroRoute Edge
+/**
+ * @deprecated Código legado — não é importado por nenhuma rota ativa.
+ * A fonte de verdade para GET /v1/models é `listAllAvailableModels()` em
+ * `src/config/modelRegistry.ts`, que lê de PROVIDER_REGISTRY + STATIC_PROVIDER_CATALOGS.
+ * Este array pode ser removido em uma versão futura.
+ */
 export const DEFAULT_MODELS_CATALOG = [
   // --- Provedores Oficiais & Cloud ---
   {

@@ -177,15 +177,25 @@ const PROVIDER_PRIORITY_TOOLS = [
 export function buildDefaultCombos(adminCfg?: Partial<AdminConfig>): Record<string, ComboConfig> {
   const allModels = listAllAvailableModels(adminCfg as AdminConfig | undefined);
 
-  // --- omni-free: modelos gratuitos ---
-  const freeModels = allModels
+  // --- omni-free: modelos gratuitos balanceados por provedor para failover real ---
+  const sortedFree = allModels
     .filter((m) => m.pricing?.free_tier === true)
     .sort((a, b) => {
       const pa = PROVIDER_PRIORITY_FREE.indexOf(a.providerId);
       const pb = PROVIDER_PRIORITY_FREE.indexOf(b.providerId);
       return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-    })
-    .slice(0, 6);
+    });
+
+  const freeModels: typeof allModels = [];
+  const freeCounts: Record<string, number> = {};
+  for (const m of sortedFree) {
+    const count = freeCounts[m.providerId] || 0;
+    if (count < 2) {
+      freeModels.push(m);
+      freeCounts[m.providerId] = count + 1;
+      if (freeModels.length >= 6) break;
+    }
+  }
 
   const freeTargets: ComboTarget[] =
     freeModels.length > 0
@@ -197,8 +207,8 @@ export function buildDefaultCombos(adminCfg?: Partial<AdminConfig>): Record<stri
           { provider: "groq", model: "llama-3.3-70b-versatile", priority: 3 },
         ];
 
-  // --- omni-best-tools: modelos com tools + custo baixo ---
-  const toolsModels = allModels
+  // --- omni-best-tools: modelos com tools + custo baixo balanceados ---
+  const sortedTools = allModels
     .filter(
       (m) =>
         m.capabilities?.tools === true &&
@@ -208,8 +218,18 @@ export function buildDefaultCombos(adminCfg?: Partial<AdminConfig>): Record<stri
       const pa = PROVIDER_PRIORITY_TOOLS.indexOf(a.providerId);
       const pb = PROVIDER_PRIORITY_TOOLS.indexOf(b.providerId);
       return (pa === -1 ? 999 : pa) - (pb === -1 ? 999 : pb);
-    })
-    .slice(0, 6);
+    });
+
+  const toolsModels: typeof allModels = [];
+  const toolsCounts: Record<string, number> = {};
+  for (const m of sortedTools) {
+    const count = toolsCounts[m.providerId] || 0;
+    if (count < 2) {
+      toolsModels.push(m);
+      toolsCounts[m.providerId] = count + 1;
+      if (toolsModels.length >= 6) break;
+    }
+  }
 
   const toolsTargets: ComboTarget[] =
     toolsModels.length > 0
@@ -281,7 +301,7 @@ function cloneConfig(cfg: AdminConfig): AdminConfig {
   return JSON.parse(JSON.stringify(cfg));
 }
 
-function invalidateCache(): void {
+export function invalidateCache(): void {
   cache = null;
 }
 

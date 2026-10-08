@@ -660,7 +660,7 @@ export function renderDashboardHtml(): string {
               <span class="status-dot"></span>
             </div>
             <span style="font-size: 0.8rem; color: var(--text-muted);">60M tokens/mês grátis · 15 RPM</span>
-            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gemini-2.5-flash, 2.0-flash, 2.5-pro</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash</span>
           </div>
 
           <!-- Antigravity CLI -->
@@ -669,8 +669,8 @@ export function renderDashboardHtml(): string {
               <span class="provider-name">Antigravity CLI (Code Assist)</span>
               <span class="status-dot"></span>
             </div>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">OAuth Google · Gemini 2.5 Pro & Claude 3.7</span>
-            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: antigravity/gemini-2.5-pro</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">OAuth Google · Gemini 3.x &amp; Claude Opus/Sonnet 4.6</span>
+            <span style="font-size: 0.75rem; color: var(--primary);">Modelos: gemini-3.7-flash-high, claude-sonnet-4-6...</span>
           </div>
 
           <!-- Groq -->
@@ -777,7 +777,7 @@ curl -X POST https://seu-worker.workers.dev/v1/search \\
       <div class="card">
         <div class="card-title">🔐 Conexão OAuth com Antigravity CLI / Google Cloud Code Assist</div>
         <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.25rem;">
-          Conecte sua conta do Google para utilizar o Claude 3.7 Sonnet e Gemini 2.5 Pro através dos endpoints oficiais do Code Assist (usados nativamente pelo Antigravity CLI).
+          Conecte sua conta do Google para utilizar modelos de ponta como <strong>Gemini 3.7 Flash</strong>, <strong>Claude Opus 4.6 Thinking</strong> e <strong>Claude Sonnet 4.6</strong> através dos endpoints oficiais do Cloud Code Assist (usados nativamente pelo Antigravity CLI). Os modelos disponíveis são carregados dinamicamente via <code>/v1internal:fetchAvailableModels</code>.
         </p>
 
         <!-- Status Card -->
